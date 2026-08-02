@@ -4,7 +4,8 @@ import android.media.AudioFormat;
 import android.media.MediaCodec;
 import android.media.MediaExtractor;
 import android.media.MediaFormat;
-import android.util.Log;
+
+import com.kail.location.utils.KailLog;
 
 import java.io.File;
 import java.nio.ByteBuffer;
@@ -24,7 +25,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
  */
 public final class MicAudioSource {
 
-    private static final String TAG = "KailLog/MicAudioSrc";
+    private static final String TAG = "MicAudioSrc";
     private static final long TIMEOUT_US = 10_000L;
     private static final int RING_CAPACITY = 1 << 21; // 2 MB PCM ring
 
@@ -188,7 +189,7 @@ public final class MicAudioSource {
                     }
                 }
                 if (track < 0 || format == null) {
-                    Log.w(TAG, "no audio track in " + path);
+                    KailLog.INSTANCE.w(null, TAG, "no audio track in " + path);
                     sleepQuiet(2000);
                     continue;
                 }
@@ -232,7 +233,7 @@ public final class MicAudioSource {
                     }
                 }
             } catch (Throwable th) {
-                Log.e(TAG, "decodeLoop", th);
+                KailLog.INSTANCE.e(null, TAG, "decodeLoop", th);
                 sleepQuiet(1000);
             } finally {
                 if (codec != null) {

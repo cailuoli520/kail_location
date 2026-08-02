@@ -4,7 +4,8 @@ import android.media.MediaCodec;
 import android.media.MediaExtractor;
 import android.media.MediaFormat;
 import android.media.Image;
-import android.util.Log;
+
+import com.kail.location.utils.KailLog;
 
 import java.nio.ByteBuffer;
 import java.util.Arrays;
@@ -20,7 +21,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
  */
 public final class CameraFrameSource {
 
-    private static final String TAG = "KailLog/CameraFrameSrc";
+    private static final String TAG = "CameraFrameSrc";
     private static final long TIMEOUT_US = 10_000L;
 
     private static volatile CameraFrameSource instance;
@@ -145,7 +146,7 @@ public final class CameraFrameSource {
                     }
                 }
                 if (track < 0 || format == null) {
-                    Log.e(TAG, "no video track in " + videoPath);
+                    KailLog.INSTANCE.e(null, TAG, "no video track in " + videoPath);
                     return;
                 }
                 extractor.selectTrack(track);
@@ -191,11 +192,11 @@ public final class CameraFrameSource {
                             break; // restart for looping
                         }
                     } else if (outIdx == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED) {
-                        Log.i(TAG, "format changed: " + codec.getOutputFormat());
+                        KailLog.INSTANCE.i(null, TAG, "format changed: " + codec.getOutputFormat());
                     }
                 }
             } catch (Throwable th) {
-                Log.e(TAG, "decodeLoop error", th);
+                KailLog.INSTANCE.e(null, TAG, "decodeLoop error", th);
                 sleepQuiet(1000);
             } finally {
                 if (codec != null) {
@@ -225,7 +226,7 @@ public final class CameraFrameSource {
             frameWidth = w;
             frameHeight = h;
         } catch (Throwable th) {
-            Log.e(TAG, "consumeImage", th);
+            KailLog.INSTANCE.e(null, TAG, "consumeImage", th);
         }
     }
 

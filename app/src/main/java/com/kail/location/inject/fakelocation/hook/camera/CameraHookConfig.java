@@ -1,6 +1,7 @@
 package com.kail.location.inject.fakelocation.hook.camera;
 
-import android.util.Log;
+
+import com.kail.location.utils.KailLog;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -20,7 +21,7 @@ import java.util.Set;
  */
 public final class CameraHookConfig {
 
-    private static final String TAG = "KailLog/CameraHookCfg";
+    private static final String TAG = "CameraHookCfg";
 
     /** World-readable (chmod 666) by the controller; inside /data/kail-loc. */
     public static final String CONFIG_PATH = "/data/kail-loc/camera_config.json";
@@ -94,7 +95,7 @@ public final class CameraHookConfig {
             String json = new String(buf, 0, off, "UTF-8").trim();
             parseInto(json, cfg);
         } catch (Throwable th) {
-            Log.e(TAG, "load config failed", th);
+            KailLog.INSTANCE.e(null, TAG, "load config failed", th);
         }
         return cfg;
     }

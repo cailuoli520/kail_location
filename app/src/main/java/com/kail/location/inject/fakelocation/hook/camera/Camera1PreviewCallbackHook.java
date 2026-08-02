@@ -1,7 +1,8 @@
 package com.kail.location.inject.fakelocation.hook.camera;
 
 import android.hardware.Camera;
-import android.util.Log;
+
+import com.kail.location.utils.KailLog;
 
 /**
  * Hook body for {@code onPreviewFrame(byte[], Camera)} installed on the
@@ -10,7 +11,7 @@ import android.util.Log;
  */
 public final class Camera1PreviewCallbackHook {
 
-    private static final String TAG = "KailLog/Cam1PreviewCb";
+    private static final String TAG = "Cam1PreviewCb";
 
     private Camera1PreviewCallbackHook() {
     }
@@ -48,7 +49,7 @@ public final class Camera1PreviewCallbackHook {
                     }
                 }
             } catch (Throwable th) {
-                Log.e(TAG, "onPreviewFrame hook", th);
+                KailLog.INSTANCE.e(null, TAG, "onPreviewFrame hook", th);
             }
         }
         onPreviewFrame_bak(receiver, data, camera);

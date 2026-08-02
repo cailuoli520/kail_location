@@ -8,8 +8,9 @@ import android.graphics.Paint;
 import android.graphics.Rect;
 import android.graphics.RectF;
 import android.graphics.SurfaceTexture;
-import android.util.Log;
 import android.view.Surface;
+
+import com.kail.location.utils.KailLog;
 
 import java.io.File;
 
@@ -24,7 +25,7 @@ import java.io.File;
  */
 public final class CameraImageSource {
 
-    private static final String TAG = "KailLog/CameraImageSrc";
+    private static final String TAG = "CameraImageSrc";
     private static final CameraImageSource INSTANCE = new CameraImageSource();
 
     private volatile Bitmap bitmap;
@@ -46,7 +47,7 @@ public final class CameraImageSource {
         if (bitmap == null || !path.equals(loadedPath) || rotOffset != rotationOffset) {
             Bitmap raw = BitmapFactory.decodeFile(path);
             if (raw == null) {
-                Log.e(TAG, "decode failed: " + path);
+                KailLog.INSTANCE.e(null, TAG, "decode failed: " + path);
                 return null;
             }
             int rot = ((rotOffset % 360) + 360) % 360;
@@ -82,7 +83,7 @@ public final class CameraImageSource {
             System.arraycopy(nv21Cache, 0, dst, 0, nv21Cache.length);
             return true;
         } catch (Throwable th) {
-            Log.e(TAG, "fillFrame", th);
+            KailLog.INSTANCE.e(null, TAG, "fillFrame", th);
             return false;
         }
     }
@@ -112,7 +113,7 @@ public final class CameraImageSource {
                 }
             }
         } catch (Throwable th) {
-            Log.e(TAG, "drawInto", th);
+            KailLog.INSTANCE.e(null, TAG, "drawInto", th);
             return false;
         }
     }
@@ -124,7 +125,7 @@ public final class CameraImageSource {
             drawInto(s, path, rotOffset);
             s.release();
         } catch (Throwable th) {
-            Log.e(TAG, "drawInto(texture)", th);
+            KailLog.INSTANCE.e(null, TAG, "drawInto(texture)", th);
         }
     }
 

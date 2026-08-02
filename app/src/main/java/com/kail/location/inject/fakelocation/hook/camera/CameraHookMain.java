@@ -1,7 +1,6 @@
 package com.kail.location.inject.fakelocation.hook.camera;
 
-import android.util.Log;
-
+import com.kail.location.utils.KailLog;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
@@ -20,7 +19,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
  */
 public final class CameraHookMain {
 
-    private static final String TAG = "KailLog/CameraHookMain";
+    private static final String TAG = "CameraHookMain";
 
     private static final AtomicBoolean hooked = new AtomicBoolean(false);
     private static volatile String currentPackage = "";
@@ -39,10 +38,10 @@ public final class CameraHookMain {
                 Camera1Hook.hook(cl);
                 Camera2Hook.hook(cl);
                 MicrophoneHook.hook(cl);
-                Log.i(TAG, "camera hooks installed for " + packageName);
+                KailLog.INSTANCE.i(null, TAG, "camera hooks installed for " + packageName);
             }
         } catch (Throwable th) {
-            Log.e(TAG, "hook failed", th);
+            KailLog.INSTANCE.e(null, TAG, "hook failed", th);
         }
     }
 
@@ -83,7 +82,7 @@ public final class CameraHookMain {
     private static void onSessionStart(CameraHookConfig cfg) {
         if (!cfg.isStreamMode() && !cfg.isImageMode() && cfg.hasRandomPool()) {
             sessionVideoPath = pickRandomVideo(cfg.videoDir);
-            Log.i(TAG, "random play picked: " + sessionVideoPath);
+            KailLog.INSTANCE.i(null, TAG, "random play picked: " + sessionVideoPath);
         } else {
             sessionVideoPath = cfg.videoPath;
         }
