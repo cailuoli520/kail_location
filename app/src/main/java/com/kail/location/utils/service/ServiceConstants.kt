@@ -10,6 +10,7 @@ object ServiceConstants {
     const val DEFAULT_BEA = 0.0f
 
     const val EXTRA_ROUTE_POINTS = "EXTRA_ROUTE_POINTS"
+    const val EXTRA_ROUTE_WAIT_TIMES = "EXTRA_ROUTE_WAIT_TIMES"
     const val EXTRA_ROUTE_LOOP = "EXTRA_ROUTE_LOOP"
     const val EXTRA_JOYSTICK_ENABLED = "EXTRA_JOYSTICK_ENABLED"
     const val EXTRA_ROUTE_SPEED = "EXTRA_ROUTE_SPEED"
@@ -19,6 +20,7 @@ object ServiceConstants {
     const val EXTRA_NATURAL_JITTER = "EXTRA_NATURAL_JITTER"
     const val EXTRA_SEEK_RATIO = "EXTRA_SEEK_RATIO"
     const val EXTRA_ROUTE_APPEND_POINTS = "EXTRA_ROUTE_APPEND_POINTS"
+    const val EXTRA_ROUTE_APPEND_WAIT_TIMES = "EXTRA_ROUTE_APPEND_WAIT_TIMES"
 
     const val CONTROL_PAUSE = "pause"
     const val CONTROL_RESUME = "resume"

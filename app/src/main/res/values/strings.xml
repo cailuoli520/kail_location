@@ -228,6 +228,11 @@
     <string name="route_plan_coord_error">请输入有效的纬度,经度</string>
     <string name="route_plan_ok">确定</string>
     <string name="route_plan_cancel">取消</string>
+    <string name="route_plan_wait_btn">等待</string>
+    <string name="route_plan_wait_title">途经点等待时间</string>
+    <string name="route_plan_wait_point">途经点</string>
+    <string name="route_plan_wait_seconds">秒</string>
+    <string name="route_plan_wait_hint">模拟到达该点后停留该秒数，0 表示不停留</string>
     <string name="route_plan_history">历史位置</string>
     <string name="route_plan_history_title">选择历史位置</string>
 

@@ -197,6 +197,11 @@ class RouteSimulationActivity : BaseActivity(), SensorEventListener {
                                 editingRouteId != null -> viewModel.getRoutePointsById(editingRouteId!!)
                                 else -> emptyList()
                             }
+                            val initialWaits = when {
+                                extendingRunning -> viewModel.runningRouteWaitTimes.value ?: emptyList()
+                                editingRouteId != null -> viewModel.getRouteWaitTimesById(editingRouteId!!)
+                                else -> emptyList()
+                            }
                             RoutePlanScreen(
                                 mapView = mMapView,
                                 onBackClick = {
@@ -211,9 +216,10 @@ class RouteSimulationActivity : BaseActivity(), SensorEventListener {
                                 },
                                 editingRouteId = editingRouteId,
                                 initialWaypoints = initialWp,
+                                initialWaitTimes = initialWaits,
                                 extendBaseCount = if (extendingRunning) initialWp.size else 0,
-                                onExtendConfirm = { waypoints ->
-                                    if (extendingRunning) viewModel.extendRunningRoute(waypoints)
+                                onExtendConfirm = { waypoints, waitTimes ->
+                                    if (extendingRunning) viewModel.extendRunningRoute(waypoints, waitTimes)
                                 },
                             onLocateClick = {
                                 mLocClient?.requestLocation()

@@ -73,6 +73,7 @@ class ServiceGoSandbox : Service() {
         const val SERVICE_GO_NOTE_ACTION_JOYSTICK_HIDE = ServiceNotificationHelper.ACTION_JOYSTICK_HIDE
 
         const val EXTRA_ROUTE_POINTS = ServiceConstants.EXTRA_ROUTE_POINTS
+        const val EXTRA_ROUTE_WAIT_TIMES = ServiceConstants.EXTRA_ROUTE_WAIT_TIMES
         const val EXTRA_ROUTE_LOOP = ServiceConstants.EXTRA_ROUTE_LOOP
         const val EXTRA_JOYSTICK_ENABLED = ServiceConstants.EXTRA_JOYSTICK_ENABLED
         const val EXTRA_ROUTE_SPEED = ServiceConstants.EXTRA_ROUTE_SPEED
@@ -81,6 +82,7 @@ class ServiceGoSandbox : Service() {
         const val EXTRA_SPEED_FLUCTUATION = ServiceConstants.EXTRA_SPEED_FLUCTUATION
         const val EXTRA_SEEK_RATIO = ServiceConstants.EXTRA_SEEK_RATIO
         const val EXTRA_ROUTE_APPEND_POINTS = ServiceConstants.EXTRA_ROUTE_APPEND_POINTS
+        const val EXTRA_ROUTE_APPEND_WAIT_TIMES = ServiceConstants.EXTRA_ROUTE_APPEND_WAIT_TIMES
         const val EXTRA_STEP_ENABLED = "EXTRA_STEP_ENABLED"
         const val EXTRA_STEP_FREQ = "EXTRA_STEP_FREQ"
         const val CONTROL_PAUSE = ServiceConstants.CONTROL_PAUSE
@@ -267,7 +269,11 @@ class ServiceGoSandbox : Service() {
 
             val routeArray = intent.getDoubleArrayExtra(EXTRA_ROUTE_POINTS)
             if (routeArray != null && routeArray.size >= 2) {
-                mRouteEngine.setupFromArray(routeArray, coordType)
+                mRouteEngine.setupFromArray(
+                    routeArray,
+                    coordType,
+                    intent.getDoubleArrayExtra(EXTRA_ROUTE_WAIT_TIMES)
+                )
                 mRouteEngine.setLoop(intent.getBooleanExtra(EXTRA_ROUTE_LOOP, false))
                 KailLog.i(this, "[sandbox] ServiceGoSandbox", "Route points loaded: ${routeArray.size} coords, active=${mRouteEngine.isActive}")
                 if (mRouteEngine.isActive) {
@@ -490,7 +496,7 @@ class ServiceGoSandbox : Service() {
                 pts.add(Pair(arr[i], arr[i + 1]))
                 i += 2
             }
-            mRouteEngine.appendPoints(pts)
+            mRouteEngine.appendPoints(pts, intent.getDoubleArrayExtra(EXTRA_ROUTE_APPEND_WAIT_TIMES))
             mCurLng = mRouteEngine.currentLng
             mCurLat = mRouteEngine.currentLat
             mCurBea = mRouteEngine.currentBea
