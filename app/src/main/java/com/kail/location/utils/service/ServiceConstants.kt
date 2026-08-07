@@ -18,6 +18,7 @@ object ServiceConstants {
     const val EXTRA_SPEED_FLUCTUATION = "EXTRA_SPEED_FLUCTUATION"
     const val EXTRA_NATURAL_JITTER = "EXTRA_NATURAL_JITTER"
     const val EXTRA_SEEK_RATIO = "EXTRA_SEEK_RATIO"
+    const val EXTRA_ROUTE_APPEND_POINTS = "EXTRA_ROUTE_APPEND_POINTS"
 
     const val CONTROL_PAUSE = "pause"
     const val CONTROL_RESUME = "resume"
@@ -25,6 +26,7 @@ object ServiceConstants {
     const val CONTROL_SEEK = "seek"
     const val CONTROL_SET_SPEED = "set_speed"
     const val CONTROL_SET_SPEED_FLUCTUATION = "set_speed_fluctuation"
+    const val CONTROL_APPEND_ROUTE = "append_route"
 
     const val COORD_WGS84 = "WGS84"
     const val COORD_BD09 = "BD09"

@@ -20,6 +20,7 @@ import kotlinx.coroutines.Dispatchers
 import com.kail.location.utils.UpdateChecker
 import com.kail.location.utils.GoUtils
 import com.kail.location.utils.KailLog
+import com.kail.location.utils.MapUtils
 import com.kail.location.utils.SimulationDiagnostics
 import android.content.Context
 import android.content.Intent
@@ -98,6 +99,12 @@ class RouteSimulationViewModel(application: Application) : AndroidViewModel(appl
 
     private val _settings = MutableStateFlow(com.kail.location.models.SimulationSettings())
     val settings: StateFlow<com.kail.location.models.SimulationSettings> = _settings.asStateFlow()
+
+    private val _runningRoutePoints = MutableStateFlow<List<LatLng>?>(null)
+    /**
+     * 当前正在模拟的路线的全部途经点（BD09），用于运行中"+"按钮编辑/延长路线。
+     */
+    val runningRoutePoints: StateFlow<List<LatLng>?> = _runningRoutePoints.asStateFlow()
 
     private val sharedPreferences = PreferenceManager.getDefaultSharedPreferences(application)
     private val _runMode = MutableStateFlow("root")
@@ -376,6 +383,15 @@ class RouteSimulationViewModel(application: Application) : AndroidViewModel(appl
                 _toastMessage.value = app.getString(R.string.route_sim_need_route)
                 return@launch
             }
+            _runningRoutePoints.value = run {
+                val list = mutableListOf<LatLng>()
+                var k = 0
+                while (k + 1 < points.size) {
+                    list.add(LatLng(points[k + 1], points[k]))
+                    k += 2
+                }
+                list
+            }
 
             val currentRunMode = sharedPreferences.getString("setting_run_mode", "root") ?: "root"
             _runMode.value = currentRunMode
@@ -453,10 +469,74 @@ class RouteSimulationViewModel(application: Application) : AndroidViewModel(appl
         _isStarting.value = false
         _isSimulating.value = false
         _isPaused.value = false
+        _runningRoutePoints.value = null
         sharedPreferences.edit()
             .putBoolean("route_sim_is_simulating", false)
             .putBoolean("route_sim_is_paused", false)
             .apply()
+    }
+
+    /**
+     * 运行中延长路线：把规划页确认后的完整途经点（BD09）与正在模拟的路线
+     * 比较，取出新增的那一段，转成 WGS84 后通过控制指令追加到正在运行的前台
+     * 服务里。模拟会自动继续走延长段，而不会停在原终点。
+     *
+     * @param fullPoints 规划页确认后的完整路线点（BD09，前若干点应与运行中路线相同）
+     */
+    fun extendRunningRoute(fullPoints: List<LatLng>) {
+        val base = _runningRoutePoints.value ?: run {
+            KailLog.w(getApplication(), TAG, "extendRunningRoute: 没有运行中的路线")
+            return
+        }
+        if (fullPoints.size <= base.size) return
+
+        var append = fullPoints.drop(base.size)
+        val baseLast = base.last()
+        // 规划页进场时可能因地图动画在终点处重复加了一个点，过滤掉与终点重合的前导点
+        while (append.isNotEmpty()) {
+            val first = append.first()
+            val dupOfBaseLast = Math.abs(first.latitude - baseLast.latitude) < 1e-6 &&
+                Math.abs(first.longitude - baseLast.longitude) < 1e-6
+            if (!dupOfBaseLast) break
+            append = append.drop(1)
+        }
+        // 去掉追加段内相邻重复点
+        val cleaned = mutableListOf<LatLng>()
+        for (p in append) {
+            val lastP = cleaned.lastOrNull()
+            if (lastP == null || Math.abs(p.latitude - lastP.latitude) >= 1e-6 || Math.abs(p.longitude - lastP.longitude) >= 1e-6) {
+                cleaned.add(p)
+            }
+        }
+        if (cleaned.isEmpty()) {
+            _toastMessage.value = getApplication<Application>().getString(R.string.route_sim_extend_empty)
+            return
+        }
+
+        val arr = DoubleArray(cleaned.size * 2)
+        var j = 0
+        for (p in cleaned) {
+            val wgs = MapUtils.bd2wgs(p.longitude, p.latitude)
+            arr[j++] = wgs[0]
+            arr[j++] = wgs[1]
+        }
+
+        val app = getApplication<Application>()
+        val serviceClass = getServiceClass(_runMode.value)
+        val intent = Intent(app, serviceClass)
+        intent.putExtra(ServiceConstants.EXTRA_CONTROL_ACTION, ServiceConstants.CONTROL_APPEND_ROUTE)
+        intent.putExtra(ServiceConstants.EXTRA_ROUTE_APPEND_POINTS, arr)
+        app.startService(intent)
+
+        _runningRoutePoints.value = fullPoints.toList()
+
+        // 若运行中的路线来自某个已保存路线，同步把延长后的点存回去，保证下次直接使用
+        val selId = _selectedRouteId.value
+        if (selId != null) {
+            updateRoute(selId, fullPoints.toList())
+        }
+        _toastMessage.value = app.getString(R.string.route_sim_extended)
+        KailLog.i(app, TAG, "extendRunningRoute: +${cleaned.size} points (WGS84) appended to ${serviceClass.simpleName}")
     }
 
     private fun scheduleStartTimeout() {

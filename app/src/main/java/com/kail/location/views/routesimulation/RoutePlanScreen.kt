@@ -90,7 +90,9 @@ fun RoutePlanScreen(
     onDeveloperModeSelected: () -> Unit = {},
     onXposedSettingsSelected: () -> Unit = {},
     editingRouteId: String? = null,
-    initialWaypoints: List<LatLng> = emptyList()
+    initialWaypoints: List<LatLng> = emptyList(),
+    extendBaseCount: Int = 0,
+    onExtendConfirm: ((List<LatLng>) -> Unit)? = null
 ) {
     var startPoint by remember { mutableStateOf(initialWaypoints.firstOrNull()?.let { "${it.latitude},${it.longitude}" } ?: "") }
     var endPoint by remember { mutableStateOf(initialWaypoints.lastOrNull()?.let { "${it.latitude},${it.longitude}" } ?: "") }
@@ -607,12 +609,19 @@ fun RoutePlanScreen(
                         onClick = {
                             try {
                                 if (waypoints.size >= 2) {
-                                    if (editingRouteId != null) {
-                                        viewModel.updateRoute(editingRouteId, waypoints.toList())
-                                        KailLog.i(context, "RoutePlanScreen", "Updated route ${editingRouteId} with ${waypoints.size} points")
-                                    } else {
-                                        viewModel.setPendingRoutePoints(waypoints.toList())
-                                        KailLog.i(context, "RoutePlanScreen", "Set pending route with ${waypoints.size} points")
+                                    when {
+                                        extendBaseCount > 0 && onExtendConfirm != null -> {
+                                            onExtendConfirm(waypoints.toList())
+                                            KailLog.i(context, "RoutePlanScreen", "Extended running route with ${waypoints.size} points (base=$extendBaseCount)")
+                                        }
+                                        editingRouteId != null -> {
+                                            viewModel.updateRoute(editingRouteId, waypoints.toList())
+                                            KailLog.i(context, "RoutePlanScreen", "Updated route ${editingRouteId} with ${waypoints.size} points")
+                                        }
+                                        else -> {
+                                            viewModel.setPendingRoutePoints(waypoints.toList())
+                                            KailLog.i(context, "RoutePlanScreen", "Set pending route with ${waypoints.size} points")
+                                        }
                                     }
                                 }
                                 onConfirmClick()

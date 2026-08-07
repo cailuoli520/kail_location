@@ -67,6 +67,7 @@ fun RouteSimulationScreen(
     onXposedSettingsSelected: () -> Unit = {},
     onNavigate: (Int) -> Unit,
     onAddRouteClick: () -> Unit,
+    onExtendRouteClick: () -> Unit = {},
     onEditRoute: (String) -> Unit = {},
     appVersion: String,
     onStartSimulation: (SimulationSettings) -> Unit,
@@ -203,7 +204,7 @@ fun RouteSimulationScreen(
                         
                         // FAB overlapping the card
                         FloatingActionButton(
-                            onClick = onAddRouteClick,
+                            onClick = { if (isSimulating) onExtendRouteClick() else onAddRouteClick() },
                             containerColor = MaterialTheme.colorScheme.primary,
                             contentColor = Color.White,
                             shape = CircleShape,

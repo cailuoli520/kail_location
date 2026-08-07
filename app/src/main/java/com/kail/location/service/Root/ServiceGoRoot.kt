@@ -224,6 +224,7 @@ class ServiceGoRoot : Service() {
         const val EXTRA_CONTROL_ACTION = ServiceConstants.EXTRA_CONTROL_ACTION
         const val EXTRA_SPEED_FLUCTUATION = ServiceConstants.EXTRA_SPEED_FLUCTUATION
         const val EXTRA_SEEK_RATIO = ServiceConstants.EXTRA_SEEK_RATIO
+        const val EXTRA_ROUTE_APPEND_POINTS = ServiceConstants.EXTRA_ROUTE_APPEND_POINTS
 
         const val EXTRA_STEP_ENABLED = "EXTRA_STEP_ENABLED"
         const val EXTRA_STEP_FREQ = "EXTRA_STEP_FREQ"
@@ -244,6 +245,7 @@ class ServiceGoRoot : Service() {
         const val CONTROL_SEEK = ServiceConstants.CONTROL_SEEK
         const val CONTROL_SET_SPEED = ServiceConstants.CONTROL_SET_SPEED
         const val CONTROL_SET_SPEED_FLUCTUATION = ServiceConstants.CONTROL_SET_SPEED_FLUCTUATION
+        const val CONTROL_APPEND_ROUTE = ServiceConstants.CONTROL_APPEND_ROUTE
         const val CONTROL_SET_STEP = "set_step"
         const val CONTROL_STOP_WIFI = "stop_wifi"
         const val CONTROL_STOP_CELL = "stop_cell"
@@ -604,6 +606,10 @@ class ServiceGoRoot : Service() {
             CONTROL_SET_SPEED_FLUCTUATION -> {
                 speedFluctuation = intent.getBooleanExtra(EXTRA_SPEED_FLUCTUATION, speedFluctuation)
             }
+
+            CONTROL_APPEND_ROUTE -> runCatching {
+                appendRouteFromControl(intent)
+            }.onFailure { KailLog.e(this, TAG, "append_route: ${it.message}") }
 
             CONTROL_SET_STEP -> {
                 stepEnabled = intent.getBooleanExtra(EXTRA_STEP_ENABLED, stepEnabled)
@@ -2031,6 +2037,36 @@ class ServiceGoRoot : Service() {
                 mJoystickManager.updateRouteStatus(mRouteEngine.progressRatio, status.first, status.second)
             }
         }
+    }
+
+    /**
+     * Append newly planned points (WGS84, [lng,lat,...]) to the running route so
+     * the simulation continues straight into the extension instead of parking.
+     */
+    private fun appendRouteFromControl(intent: Intent) {
+        val arr = intent.getDoubleArrayExtra(EXTRA_ROUTE_APPEND_POINTS)
+        if (arr == null || arr.size < 2) {
+            KailLog.w(this, TAG, "append_route: no points provided")
+            return
+        }
+        val pts = mutableListOf<Pair<Double, Double>>()
+        var i = 0
+        while (i + 1 < arr.size) {
+            pts.add(Pair(arr[i], arr[i + 1]))
+            i += 2
+        }
+        mRouteEngine.appendPoints(pts)
+        mCurLng = mRouteEngine.currentLng
+        mCurLat = mRouteEngine.currentLat
+        mCurBea = mRouteEngine.currentBea
+        updateJoystickStatus()
+        isStop = false
+        lastRouteTickElapsedMs = SystemClock.elapsedRealtime()
+        if (locationLoopStarted && this::mLocHandler.isInitialized && !mLocHandler.hasMessages(HANDLER_MSG_ID)) {
+            mLocHandler.sendEmptyMessage(HANDLER_MSG_ID)
+        }
+        broadcastStatus()
+        KailLog.i(this, TAG, "append_route: +${pts.size} points, now at lat=$mCurLat lng=$mCurLng")
     }
 
     // ------------------------------------------------------------------

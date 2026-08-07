@@ -96,6 +96,35 @@ class RouteEngine {
         routeFinished = false
     }
 
+    /**
+     * Append extra points to the end of the route while a simulation is
+     * running. This lets the user extend a route after (or before) it reaches
+     * its original end: the engine keeps whatever progress it already made,
+     * and once it runs out of the original segments it continues straight into
+     * the newly appended ones. If the route had already finished and parked at
+     * the destination, progression is re-activated.
+     *
+     * @param newPoints additional points (WGS84) to append after the current last point
+     */
+    fun appendPoints(newPoints: List<Pair<Double, Double>>) {
+        if (newPoints.isEmpty()) return
+        val wasFinished = routeFinished
+        routePoints.addAll(newPoints)
+        calculateRouteDistances()
+        routeFinished = false
+        if (wasFinished) segmentProgressMeters = 0.0
+        if (routeIndex >= routePoints.size - 1) {
+            routeIndex = (routePoints.size - newPoints.size - 1).coerceAtLeast(0)
+        }
+        val idx = routeIndex.coerceIn(0, (routePoints.size - 1).coerceAtLeast(0))
+        if (idx + 1 < routePoints.size) {
+            val a = routePoints[idx]
+            val b = routePoints[idx + 1]
+            currentBea = GeoMath.bearingDegrees(a.first, a.second, b.first, b.second)
+        }
+        KailLog.i(null, TAG, "appendPoints: +${newPoints.size} points, total=${routePoints.size}, totalDistance=${"%.1f".format(totalDistance)}m, finished=$wasFinished")
+    }
+
     fun seekToRatio(ratio: Float) {
         if (routePoints.size < 2 || routeCumulativeDistances.isEmpty()) return
         // Seeking back into the route re-activates progression.

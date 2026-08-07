@@ -212,6 +212,8 @@
     <string name="route_sim_rename_cancel">取消</string>
     <string name="route_sim_need_route">请先添加并保存路线</string>
     <string name="route_sim_start_failed">启动模拟失败</string>
+    <string name="route_sim_extended">已延长路线，模拟继续</string>
+    <string name="route_sim_extend_empty">未添加新的路线点</string>
 
     <!-- Route Plan -->
     <string name="route_plan_search_hint">搜索地点</string>
