@@ -769,4 +769,19 @@
     <string name="setting_floating_window_size">浮窗大小</string>
     <string name="setting_floating_window_width">寬度</string>
     <string name="setting_floating_window_height">高度</string>
+
+    <!-- Route simulation: extend / waypoint wait -->
+    <string name="route_sim_extended">已延長路線，模擬繼續</string>
+    <string name="route_sim_extend_empty">未添加新的路線點</string>
+    <string name="route_waiting">等待中</string>
+    <string name="route_plan_wait_btn">等待</string>
+    <string name="route_plan_wait_title">途經點等待時間</string>
+    <string name="route_plan_wait_point">途經點</string>
+    <string name="route_plan_wait_seconds">秒</string>
+    <string name="route_plan_wait_hint">模擬到達該點後停留該秒數，0 表示不停留</string>
+
+    <!-- Navigation simulation -->
+    <string name="nav_sim_plan">開始規劃</string>
+    <string name="nav_sim_planned">已規劃</string>
+    <string name="nav_sim_plan_title">選擇起點和終點</string>
 </resources>

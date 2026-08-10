@@ -1040,7 +1040,7 @@ fun WaypointWaitDialog(
  * 生成一个带倒三角指示符的等待时长徽标位图，用于标记在设置了等待时间的途经点上方。
  * 例如等待 10 秒 → 蓝色小气泡上写 "10s"，底部小三角指向该途经点。
  */
-private fun buildWaitBadgeBitmap(context: Context, seconds: Int): Bitmap {
+fun buildWaitBadgeBitmap(context: Context, seconds: Int): Bitmap {
     val density = context.resources.displayMetrics.density
     val text = "${seconds}s"
     val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {

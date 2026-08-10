@@ -177,6 +177,9 @@
     <!-- Navigation -->
     <string name="nav_menu_sim_group">模拟</string>
     <string name="nav_sim_title">模拟导航</string>
+    <string name="nav_sim_plan_title">选择起点和终点</string>
+    <string name="nav_sim_plan">开始规划</string>
+    <string name="nav_sim_planned">已规划</string>
     <string name="nav_sim_start">开始模拟</string>
     <string name="nav_sim_stop">结束模拟</string>
     <string name="nav_sim_pause">暂停</string>
@@ -214,6 +217,7 @@
     <string name="route_sim_start_failed">启动模拟失败</string>
     <string name="route_sim_extended">已延长路线，模拟继续</string>
     <string name="route_sim_extend_empty">未添加新的路线点</string>
+    <string name="route_waiting">等待中</string>
 
     <!-- Route Plan -->
     <string name="route_plan_search_hint">搜索地点</string>

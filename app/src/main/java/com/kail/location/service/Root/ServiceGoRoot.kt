@@ -2040,7 +2040,8 @@ class ServiceGoRoot : Service() {
         if (this::mJoystickManager.isInitialized && mRouteEngine.isActive) {
             val status = mRouteEngine.buildStatusString()
             if (status != null) {
-                mJoystickManager.updateRouteStatus(mRouteEngine.progressRatio, status.first, status.second)
+                val waitSuffix = if (mRouteEngine.isWaiting) " · " + getString(R.string.route_waiting) else ""
+                mJoystickManager.updateRouteStatus(mRouteEngine.progressRatio, status.first + waitSuffix, status.second)
             }
         }
     }

@@ -315,9 +315,8 @@ class RouteEngine {
 
         val distStr = if (currentDist > 1000) String.format("%.2fkm", currentDist / 1000) else String.format("%.0fm", currentDist)
         val totalDistStr = if (totalDistance > 1000) String.format("%.2fkm", totalDistance / 1000) else String.format("%.0fm", totalDistance)
-        val waitStr = if (isWaiting) " · 等待中" else ""
         val bd = MapUtils.wgs2bd(currentLng, currentLat)
-        return "$distStr / $totalDistStr$waitStr" to LatLng(bd[1], bd[0])
+        return "$distStr / $totalDistStr" to LatLng(bd[1], bd[0])
     }
 
     private fun calculateRouteDistances() {

@@ -783,4 +783,19 @@
     <string name="setting_floating_window_size">フローティングウィンドウサイズ</string>
     <string name="setting_floating_window_width">幅</string>
     <string name="setting_floating_window_height">高さ</string>
+
+    <!-- Route simulation: extend / waypoint wait -->
+    <string name="route_sim_extended">ルートを延長しました、シミュレーション継続</string>
+    <string name="route_sim_extend_empty">新しいルート地点が追加されていません</string>
+    <string name="route_waiting">待機中</string>
+    <string name="route_plan_wait_btn">待機</string>
+    <string name="route_plan_wait_title">経由地の待機時間</string>
+    <string name="route_plan_wait_point">経由地</string>
+    <string name="route_plan_wait_seconds">秒</string>
+    <string name="route_plan_wait_hint">この地点に指定秒数留まります。0 の場合は停止しません</string>
+
+    <!-- Navigation simulation -->
+    <string name="nav_sim_plan">ルートを計画</string>
+    <string name="nav_sim_planned">計画済み</string>
+    <string name="nav_sim_plan_title">出発地と目的地を設定</string>
 </resources>
