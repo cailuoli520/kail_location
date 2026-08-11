@@ -140,7 +140,7 @@ class NavigationSimulationViewModel(application: Application) : AndroidViewModel
             if (intent?.action == "com.kail.location.service.STATUS_CHANGED") {
                 val isSim = intent.getBooleanExtra("is_simulating", false)
                 val isPau = intent.getBooleanExtra("is_paused", false)
-                _isSimulating.value = isSim
+                _isSimulating.value = isSim || isPau
                 _isPaused.value = isPau
                 if (isSim) {
                     startLocationMonitor()

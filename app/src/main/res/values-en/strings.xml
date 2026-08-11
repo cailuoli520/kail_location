@@ -171,6 +171,11 @@
     <string name="nav_app_tips">For learning purposes only. Use at your own risk!</string>
     <string name="nav_menu_sponsor">Sponsor</string>
     <string name="nav_menu_github">Source Code</string>
+    <string name="nav_menu_faq">FAQ</string>
+    <string name="faq_title">FAQ</string>
+    <string name="faq_retry">Retry</string>
+    <string name="faq_empty">No FAQ available</string>
+    <string name="faq_updated_at">Updated at</string>
     <string name="nav_menu_run_mode">Run Mode</string>
     <string name="run_mode_dialog_title">Select Run Mode</string>
     <string name="run_mode_root">Root Mode</string>

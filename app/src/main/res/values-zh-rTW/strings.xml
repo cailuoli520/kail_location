@@ -152,6 +152,11 @@
     <string name="nav_app_tips">僅供學習使用，否則後果自負！</string>
     <string name="nav_menu_sponsor">贊助作者</string>
     <string name="nav_menu_github">開源倉庫</string>
+    <string name="nav_menu_faq">常見問題</string>
+    <string name="faq_title">常見問題</string>
+    <string name="faq_retry">重試</string>
+    <string name="faq_empty">暫無常見問題</string>
+    <string name="faq_updated_at">更新於</string>
     <string name="nav_menu_run_mode">運行模式</string>
     <string name="run_mode_dialog_title">選擇運行模式</string>
     <string name="run_mode_root">Root 模式</string>

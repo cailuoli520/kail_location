@@ -149,6 +149,11 @@
     <string name="nav_app_tips">学習用途のみ。自己責任でご利用ください！</string>
     <string name="nav_menu_sponsor">作者を支援</string>
     <string name="nav_menu_github">オープンソース</string>
+    <string name="nav_menu_faq">よくある質問</string>
+    <string name="faq_title">よくある質問</string>
+    <string name="faq_retry">再試行</string>
+    <string name="faq_empty">よくある質問はありません</string>
+    <string name="faq_updated_at">更新日</string>
     <string name="nav_menu_run_mode">実行モード</string>
     <string name="run_mode_dialog_title">実行モードを選択</string>
     <string name="run_mode_root">Root モード</string>

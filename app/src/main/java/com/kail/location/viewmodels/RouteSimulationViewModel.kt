@@ -139,10 +139,10 @@ class RouteSimulationViewModel(application: Application) : AndroidViewModel(appl
                 startTimeoutJob?.cancel()
                 _isStarting.value = false
             }
-            _isSimulating.value = isSim
+            _isSimulating.value = isSim || isPau
             _isPaused.value = isPau
             sharedPreferences.edit()
-                .putBoolean("route_sim_is_simulating", isSim)
+                .putBoolean("route_sim_is_simulating", isSim || isPau)
                 .putBoolean("route_sim_is_paused", isPau)
                 .apply()
         }

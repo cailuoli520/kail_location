@@ -446,6 +446,8 @@ dependencies {
     implementation(libs.material)
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation("io.noties.markwon:core:4.6.2")
+    implementation("io.noties.markwon:image-coil:4.6.2")
+    implementation("io.coil-kt:coil:1.4.0")
 
     // Dobby
     implementation("io.github.vvb2060.ndk:dobby:1.2")
