@@ -7,11 +7,7 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
-import java.security.cert.X509Certificate
 import java.util.concurrent.TimeUnit
-import javax.net.ssl.SSLContext
-import javax.net.ssl.TrustManager
-import javax.net.ssl.X509TrustManager
 
 object RuoYiClient {
 
@@ -20,22 +16,9 @@ object RuoYiClient {
 
     var baseUrl: String = BuildConfig.APP_API_URL
 
-    private val trustAllCertificates = object : X509TrustManager {
-        override fun checkClientTrusted(chain: Array<out X509Certificate>?, authType: String?) {}
-        override fun checkServerTrusted(chain: Array<out X509Certificate>?, authType: String?) {}
-        override fun getAcceptedIssuers(): Array<X509Certificate> = arrayOf()
-    }
-
     val okHttpClient: OkHttpClient = OkHttpClient.Builder()
         .connectTimeout(15, TimeUnit.SECONDS)
         .readTimeout(15, TimeUnit.SECONDS)
-        .sslSocketFactory(
-            SSLContext.getInstance("TLS").apply {
-                init(null, arrayOf<TrustManager>(trustAllCertificates), java.security.SecureRandom())
-            }.socketFactory,
-            trustAllCertificates
-        )
-        .hostnameVerifier { _, _ -> true }
         .build()
 
     data class AuthResult(

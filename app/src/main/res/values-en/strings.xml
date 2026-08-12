@@ -210,6 +210,7 @@
     <string name="update_ignore">Ignore</string>
     <string name="update_time">Updated: </string>
     <string name="update_commit">Release Notes: </string>
+    <string name="update_file_size">File size: %1$s</string>
 
     <!-- Navigation Simulation -->
     <string name="nav_sim_title">Navigation Simulation</string>

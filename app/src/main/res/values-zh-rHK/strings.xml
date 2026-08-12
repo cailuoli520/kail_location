@@ -188,6 +188,7 @@
     <string name="update_ignore">忽略一次</string>
     <string name="update_time">更新時間：</string>
     <string name="update_commit">變更資訊：</string>
+    <string name="update_file_size">安裝包大小：%1$s</string>
 
     <string name="nav_sim_title">導航模擬</string>
     <string name="nav_sim_start">開始導航</string>

@@ -178,6 +178,7 @@
     <string name="update_ignore">忽略一次</string>
     <string name="update_time">更新时间：</string>
     <string name="update_commit">提交信息：</string>
+    <string name="update_file_size">安装包大小：%1$s</string>
 
     <!-- Navigation -->
     <string name="nav_menu_sim_group">模拟</string>

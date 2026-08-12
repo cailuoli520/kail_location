@@ -102,6 +102,7 @@ fun RouteSimulationScreen(
 
     val isDownloading by viewModel.isDownloading.collectAsState()
     val downloadProgress by viewModel.downloadProgress.collectAsState()
+    val downloadDeterminate by viewModel.downloadDeterminate.collectAsState()
     val installUri by viewModel.installUri.collectAsState()
     val toastMessage by viewModel.toastMessage.collectAsState()
     
@@ -117,6 +118,7 @@ fun RouteSimulationScreen(
             info = updateInfo!!,
             downloading = isDownloading,
             progress = downloadProgress,
+            progressIndeterminate = !downloadDeterminate,
             onDismiss = { viewModel.dismissUpdateDialog() },
             onStartDownload = { viewModel.startUpdateDownload(context) }
         )
