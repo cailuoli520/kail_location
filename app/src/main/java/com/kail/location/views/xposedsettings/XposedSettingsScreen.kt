@@ -19,6 +19,9 @@ import androidx.compose.ui.unit.dp
 import androidx.preference.PreferenceManager
 import com.kail.location.R
 import com.kail.location.views.common.AppDrawer
+import com.kail.location.views.common.BadgedControl
+import com.kail.location.views.common.HelpActionButton
+import com.kail.location.views.common.HelpOverlayScrim
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -36,6 +39,8 @@ fun XposedSettingsScreen(
     val scrollState = rememberScrollState()
     val drawerState = remember { androidx.compose.material3.DrawerState(initialValue = androidx.compose.material3.DrawerValue.Closed) }
     val scope = rememberCoroutineScope()
+
+    var showHelp by remember { mutableStateOf(false) }
 
     var enableMockGnss by remember { mutableStateOf(prefs.getBoolean("setting_gps_satellite_sim", true)) }
     var disableFused by remember { mutableStateOf(prefs.getBoolean("setting_disable_fused", false)) }
@@ -63,120 +68,159 @@ fun XposedSettingsScreen(
             )
         }
     ) {
-        Scaffold(
-            topBar = {
-                TopAppBar(
-                    title = { Text(stringResource(R.string.drawer_xposed_settings)) },
-                    navigationIcon = {
-                        IconButton(onClick = { scope.launch { drawerState.open() } }) {
-                            Icon(
-                                imageVector = Icons.Default.Menu,
-                                contentDescription = "Menu",
-                                tint = Color.White
-                            )
-                        }
-                    },
-                    colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = MaterialTheme.colorScheme.primary,
-                        titleContentColor = Color.White,
-                        navigationIconContentColor = Color.White,
-                        actionIconContentColor = Color.White
+        Box {
+            Scaffold(
+                topBar = {
+                    TopAppBar(
+                        title = { Text(stringResource(R.string.drawer_xposed_settings)) },
+                        navigationIcon = {
+                            BadgedControl(show = showHelp, number = 1) {
+                                IconButton(onClick = { scope.launch { drawerState.open() } }) {
+                                    Icon(
+                                        imageVector = Icons.Default.Menu,
+                                        contentDescription = "Menu",
+                                        tint = Color.White
+                                    )
+                                }
+                            }
+                        },
+                        actions = {
+                            HelpActionButton(showHelp = showHelp) { showHelp = true }
+                        },
+                        colors = TopAppBarDefaults.topAppBarColors(
+                            containerColor = MaterialTheme.colorScheme.primary,
+                            titleContentColor = Color.White,
+                            navigationIconContentColor = Color.White,
+                            actionIconContentColor = Color.White
+                        )
                     )
-                )
+                }
+            ) { padding ->
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(padding)
+                        .verticalScroll(scrollState)
+                ) {
+                    PreferenceCategory(title = stringResource(R.string.setting_group_satellite_and_signal))
+
+                    BadgedControl(show = showHelp, number = 2, modifier = Modifier.fillMaxWidth()) {
+                        SwitchPreference(
+                            title = stringResource(R.string.setting_gps_satellite_title),
+                            checked = enableMockGnss,
+                            onCheckedChange = {
+                                enableMockGnss = it
+                                prefs.edit().putBoolean("setting_gps_satellite_sim", it).apply()
+                            },
+                            summary = stringResource(R.string.setting_gps_satellite_summary)
+                        )
+                    }
+
+                    BadgedControl(show = showHelp, number = 3, modifier = Modifier.fillMaxWidth()) {
+                        SwitchPreference(
+                            title = stringResource(R.string.setting_disable_fused),
+                            checked = disableFused,
+                            onCheckedChange = {
+                                disableFused = it
+                                prefs.edit().putBoolean("setting_disable_fused", it).apply()
+                            },
+                            summary = stringResource(R.string.setting_disable_fused_summary)
+                        )
+                    }
+
+                    BadgedControl(show = showHelp, number = 4, modifier = Modifier.fillMaxWidth()) {
+                        SwitchPreference(
+                            title = stringResource(R.string.setting_hide_mock),
+                            checked = hideMock,
+                            onCheckedChange = {
+                                hideMock = it
+                                prefs.edit().putBoolean("setting_hide_mock", it).apply()
+                            },
+                            summary = stringResource(R.string.setting_hide_mock_summary)
+                        )
+                    }
+
+                    BadgedControl(show = showHelp, number = 5, modifier = Modifier.fillMaxWidth()) {
+                        SwitchPreference(
+                            title = stringResource(R.string.setting_disable_wifi_scan),
+                            checked = disableWifiScan,
+                            onCheckedChange = {
+                                disableWifiScan = it
+                                prefs.edit().putBoolean("setting_disable_wifi_scan", it).apply()
+                            },
+                            summary = stringResource(R.string.setting_disable_wifi_scan_summary)
+                        )
+                    }
+
+                    BadgedControl(show = showHelp, number = 6, modifier = Modifier.fillMaxWidth()) {
+                        SwitchPreference(
+                            title = stringResource(R.string.setting_downgrade_cdma),
+                            checked = downgradeCdma,
+                            onCheckedChange = {
+                                downgradeCdma = it
+                                prefs.edit().putBoolean("setting_downgrade_cdma", it).apply()
+                            },
+                            summary = stringResource(R.string.setting_downgrade_cdma_summary)
+                        )
+                    }
+
+                    PreferenceCategory(title = stringResource(R.string.setting_group_anti_detect))
+
+                    BadgedControl(show = showHelp, number = 7, modifier = Modifier.fillMaxWidth()) {
+                        SwitchPreference(
+                            title = stringResource(R.string.setting_anti_pullback),
+                            checked = antiPullback,
+                            onCheckedChange = {
+                                antiPullback = it
+                                prefs.edit().putBoolean("setting_anti_pullback", it).apply()
+                            },
+                            summary = stringResource(R.string.setting_anti_pullback_summary)
+                        )
+                    }
+
+                    PreferenceCategory(title = stringResource(R.string.setting_group_intercept))
+
+                    BadgedControl(show = showHelp, number = 8, modifier = Modifier.fillMaxWidth()) {
+                        EditTextPreference(
+                            title = stringResource(R.string.setting_min_satellites),
+                            value = minSatellites,
+                            onValueChange = {
+                                minSatellites = it
+                                prefs.edit().putString("setting_min_satellites", it).apply()
+                            },
+                            description = stringResource(R.string.setting_min_satellites_summary)
+                        )
+                    }
+
+                    BadgedControl(show = showHelp, number = 9, modifier = Modifier.fillMaxWidth()) {
+                        EditTextPreference(
+                            title = stringResource(R.string.setting_report_interval),
+                            value = reportInterval,
+                            onValueChange = {
+                                reportInterval = it
+                                prefs.edit().putString("setting_report_interval", it).apply()
+                            },
+                            description = stringResource(R.string.setting_report_interval_summary)
+                        )
+                    }
+                }
             }
-        ) { padding ->
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(padding)
-                    .verticalScroll(scrollState)
-            ) {
-                PreferenceCategory(title = stringResource(R.string.setting_group_satellite_and_signal))
 
-                SwitchPreference(
-                    title = stringResource(R.string.setting_gps_satellite_title),
-                    checked = enableMockGnss,
-                    onCheckedChange = {
-                        enableMockGnss = it
-                        prefs.edit().putBoolean("setting_gps_satellite_sim", it).apply()
-                    },
-                    summary = stringResource(R.string.setting_gps_satellite_summary)
-                )
-
-                SwitchPreference(
-                    title = stringResource(R.string.setting_disable_fused),
-                    checked = disableFused,
-                    onCheckedChange = {
-                        disableFused = it
-                        prefs.edit().putBoolean("setting_disable_fused", it).apply()
-                    },
-                    summary = stringResource(R.string.setting_disable_fused_summary)
-                )
-
-                SwitchPreference(
-                    title = stringResource(R.string.setting_hide_mock),
-                    checked = hideMock,
-                    onCheckedChange = {
-                        hideMock = it
-                        prefs.edit().putBoolean("setting_hide_mock", it).apply()
-                    },
-                    summary = stringResource(R.string.setting_hide_mock_summary)
-                )
-
-                SwitchPreference(
-                    title = stringResource(R.string.setting_disable_wifi_scan),
-                    checked = disableWifiScan,
-                    onCheckedChange = {
-                        disableWifiScan = it
-                        prefs.edit().putBoolean("setting_disable_wifi_scan", it).apply()
-                    },
-                    summary = stringResource(R.string.setting_disable_wifi_scan_summary)
-                )
-
-                SwitchPreference(
-                    title = stringResource(R.string.setting_downgrade_cdma),
-                    checked = downgradeCdma,
-                    onCheckedChange = {
-                        downgradeCdma = it
-                        prefs.edit().putBoolean("setting_downgrade_cdma", it).apply()
-                    },
-                    summary = stringResource(R.string.setting_downgrade_cdma_summary)
-                )
-
-                PreferenceCategory(title = stringResource(R.string.setting_group_anti_detect))
-
-                SwitchPreference(
-                    title = stringResource(R.string.setting_anti_pullback),
-                    checked = antiPullback,
-                    onCheckedChange = {
-                        antiPullback = it
-                        prefs.edit().putBoolean("setting_anti_pullback", it).apply()
-                    },
-                    summary = stringResource(R.string.setting_anti_pullback_summary)
-                )
-
-                PreferenceCategory(title = stringResource(R.string.setting_group_intercept))
-
-                EditTextPreference(
-                    title = stringResource(R.string.setting_min_satellites),
-                    value = minSatellites,
-                    onValueChange = {
-                        minSatellites = it
-                        prefs.edit().putString("setting_min_satellites", it).apply()
-                    },
-                    description = stringResource(R.string.setting_min_satellites_summary)
-                )
-
-                EditTextPreference(
-                    title = stringResource(R.string.setting_report_interval),
-                    value = reportInterval,
-                    onValueChange = {
-                        reportInterval = it
-                        prefs.edit().putString("setting_report_interval", it).apply()
-                    },
-                    description = stringResource(R.string.setting_report_interval_summary)
-                )
-            }
+            HelpOverlayScrim(
+                showHelp = showHelp,
+                entries = listOf(
+                    1 to R.string.help_xposed_menu,
+                    2 to R.string.help_xposed_gps_satellite,
+                    3 to R.string.help_xposed_disable_fused,
+                    4 to R.string.help_xposed_hide_mock,
+                    5 to R.string.help_xposed_disable_wifi_scan,
+                    6 to R.string.help_xposed_downgrade_cdma,
+                    7 to R.string.help_xposed_anti_pullback,
+                    8 to R.string.help_xposed_min_satellites,
+                    9 to R.string.help_xposed_report_interval
+                ),
+                onDismiss = { showHelp = false }
+            )
         }
     }
 }

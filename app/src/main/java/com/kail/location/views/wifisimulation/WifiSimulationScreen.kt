@@ -4,7 +4,7 @@ import com.kail.location.utils.GoUtils
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -33,6 +33,9 @@ import com.kail.location.R
 import com.kail.location.models.WifiInfo
 import com.kail.location.viewmodels.WifiSimulationViewModel
 import com.kail.location.views.common.AppDrawer
+import com.kail.location.views.common.BadgedControl
+import com.kail.location.views.common.HelpActionButton
+import com.kail.location.views.common.HelpOverlayScrim
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -52,6 +55,7 @@ fun WifiSimulationScreen(
     var renameTarget by remember { mutableStateOf<WifiInfo?>(null) }
     var renameText by remember { mutableStateOf("") }
     var showScanDialog by remember { mutableStateOf(false) }
+    var showHelp by remember { mutableStateOf(false) }
 
     val drawerState = rememberDrawerState(DrawerValue.Closed)
     val scope = rememberCoroutineScope()
@@ -92,34 +96,43 @@ fun WifiSimulationScreen(
             )
         }
     ) {
+        Box {
         Scaffold(
             topBar = {
                 TopAppBar(
                     title = { Text(stringResource(R.string.wifi_sim_title)) },
                     navigationIcon = {
-                        IconButton(onClick = { scope.launch { drawerState.open() } }) {
-                            Icon(
-                                imageVector = Icons.Default.Menu,
-                                contentDescription = "Menu",
-                                tint = Color.White
-                            )
+                        BadgedControl(show = showHelp, number = 1) {
+                            IconButton(onClick = { scope.launch { drawerState.open() } }) {
+                                Icon(
+                                    imageVector = Icons.Default.Menu,
+                                    contentDescription = "Menu",
+                                    tint = Color.White
+                                )
+                            }
                         }
+                    },
+                    actions = {
+                        HelpActionButton(showHelp = showHelp) { showHelp = true }
                     },
                     colors = TopAppBarDefaults.topAppBarColors(
                         containerColor = MaterialTheme.colorScheme.primary,
                         titleContentColor = Color.White,
-                        navigationIconContentColor = Color.White
+                        navigationIconContentColor = Color.White,
+                        actionIconContentColor = Color.White
                     )
                 )
             },
             floatingActionButton = {
-                FloatingActionButton(
-                    onClick = onAddClick,
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    contentColor = Color.White,
-                    shape = CircleShape
-                ) {
-                    Icon(Icons.Default.Add, contentDescription = stringResource(R.string.wifi_sim_add))
+                BadgedControl(show = showHelp, number = 2) {
+                    FloatingActionButton(
+                        onClick = onAddClick,
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        contentColor = Color.White,
+                        shape = CircleShape
+                    ) {
+                        Icon(Icons.Default.Add, contentDescription = stringResource(R.string.wifi_sim_add))
+                    }
                 }
             }
         ) { paddingValues ->
@@ -137,7 +150,8 @@ fun WifiSimulationScreen(
                         viewModel.setSimulating(true)
                     },
                     onStopSimulating = { viewModel.setSimulating(false) },
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 16.dp)
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 16.dp),
+                    showHelp = showHelp
                 )
             } else {
                 // Empty state card with scan button
@@ -166,34 +180,36 @@ fun WifiSimulationScreen(
                             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
                         )
                         Spacer(modifier = Modifier.height(12.dp))
-                        Button(
-                            onClick = {
-                                viewModel.scanNearbyWifi()
-                                showScanDialog = true
-                            },
-                            enabled = !isScanning,
-                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
-                            shape = RoundedCornerShape(20.dp)
-                        ) {
-                            if (isScanning) {
-                                CircularProgressIndicator(
-                                    modifier = Modifier.size(18.dp),
-                                    color = Color.White,
-                                    strokeWidth = 2.dp
+                        BadgedControl(show = showHelp, number = 5) {
+                            Button(
+                                onClick = {
+                                    viewModel.scanNearbyWifi()
+                                    showScanDialog = true
+                                },
+                                enabled = !isScanning,
+                                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+                                shape = RoundedCornerShape(20.dp)
+                            ) {
+                                if (isScanning) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(18.dp),
+                                        color = Color.White,
+                                        strokeWidth = 2.dp
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                } else {
+                                    Icon(
+                                        imageVector = Icons.Default.Search,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                }
+                                Text(
+                                    text = if (isScanning) stringResource(R.string.wifi_sim_scanning) else stringResource(R.string.wifi_sim_scan_nearby),
+                                    fontSize = 14.sp
                                 )
-                                Spacer(modifier = Modifier.width(6.dp))
-                            } else {
-                                Icon(
-                                    imageVector = Icons.Default.Search,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(18.dp)
-                                )
-                                Spacer(modifier = Modifier.width(6.dp))
                             }
-                            Text(
-                                text = if (isScanning) stringResource(R.string.wifi_sim_scanning) else stringResource(R.string.wifi_sim_scan_nearby),
-                                fontSize = 14.sp
-                            )
                         }
 
                     }
@@ -208,33 +224,37 @@ fun WifiSimulationScreen(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                TextButton(
-                    onClick = {
-                        viewModel.scanNearbyWifi()
-                        showScanDialog = true
-                    },
-                    enabled = !isSimulating
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Search,
-                        contentDescription = null,
-                        modifier = Modifier.size(16.dp)
-                    )
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text(stringResource(R.string.wifi_sim_scan_nearby), fontSize = 12.sp)
-                }
-                if (wifiList.isNotEmpty()) {
+                BadgedControl(show = showHelp, number = 6) {
                     TextButton(
                         onClick = {
-                            if (selectedIds.size == wifiList.size) viewModel.deselectAll()
-                            else viewModel.selectAll()
+                            viewModel.scanNearbyWifi()
+                            showScanDialog = true
                         },
                         enabled = !isSimulating
                     ) {
-                        Text(
-                            if (selectedIds.size == wifiList.size) stringResource(R.string.wifi_sim_deselect_all) else stringResource(R.string.wifi_sim_select_all),
-                            fontSize = 12.sp
+                        Icon(
+                            imageVector = Icons.Default.Search,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp)
                         )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(stringResource(R.string.wifi_sim_scan_nearby), fontSize = 12.sp)
+                    }
+                }
+                if (wifiList.isNotEmpty()) {
+                    BadgedControl(show = showHelp, number = 7) {
+                        TextButton(
+                            onClick = {
+                                if (selectedIds.size == wifiList.size) viewModel.deselectAll()
+                                else viewModel.selectAll()
+                            },
+                            enabled = !isSimulating
+                        ) {
+                            Text(
+                                if (selectedIds.size == wifiList.size) stringResource(R.string.wifi_sim_deselect_all) else stringResource(R.string.wifi_sim_select_all),
+                                fontSize = 12.sp
+                            )
+                        }
                     }
                 }
             }
@@ -272,7 +292,7 @@ fun WifiSimulationScreen(
                     contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    items(wifiList) { wifi ->
+                    itemsIndexed(wifiList) { index, wifi ->
                         val isSelected = wifi.id in selectedIds
                         WifiHistoryCard(
                             wifi = wifi,
@@ -283,14 +303,34 @@ fun WifiSimulationScreen(
                                 renameTarget = wifi
                                 renameText = wifi.name.ifBlank { wifi.ssid }
                             },
-                            onDelete = { viewModel.deleteWifi(wifi.id) }
+                            onDelete = { viewModel.deleteWifi(wifi.id) },
+                            showHelp = showHelp && index == 0,
+                            badgeBase = 8
                         )
                     }
                 }
             }
         }
     }
-}
+        HelpOverlayScrim(
+            showHelp = showHelp,
+            entries = listOf(
+                1 to R.string.help_wifi_sim_menu,
+                2 to R.string.help_wifi_sim_add,
+                3 to R.string.help_wifi_sim_start,
+                4 to R.string.help_wifi_sim_stop,
+                5 to R.string.help_wifi_sim_scan_empty,
+                6 to R.string.help_wifi_sim_scan_list,
+                7 to R.string.help_wifi_sim_select_all,
+                8 to R.string.help_wifi_sim_item_check,
+                9 to R.string.help_wifi_sim_item_row,
+                10 to R.string.help_wifi_sim_item_rename,
+                11 to R.string.help_wifi_sim_item_delete
+            ),
+            onDismiss = { showHelp = false }
+        )
+        }
+    }
 
     // Rename Dialog
     if (renameTarget != null) {
@@ -428,7 +468,8 @@ fun WifiTargetCard(
     isSimulating: Boolean,
     onStartSimulating: () -> Unit,
     onStopSimulating: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    showHelp: Boolean = false
 ) {
     Card(
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
@@ -494,24 +535,28 @@ fun WifiTargetCard(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 if (!isSimulating) {
-                    Button(
-                        onClick = onStartSimulating,
-                        enabled = activeList.isNotEmpty(),
-                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
-                        shape = RoundedCornerShape(20.dp),
-                        contentPadding = PaddingValues(horizontal = 24.dp, vertical = 8.dp)
-                    ) {
-                        Text(stringResource(R.string.wifi_sim_start), fontSize = 14.sp)
-                    }
-                } else {
-                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    BadgedControl(show = showHelp, number = 3) {
                         Button(
-                            onClick = onStopSimulating,
-                            colors = ButtonDefaults.buttonColors(containerColor = Color.Red),
+                            onClick = onStartSimulating,
+                            enabled = activeList.isNotEmpty(),
+                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
                             shape = RoundedCornerShape(20.dp),
                             contentPadding = PaddingValues(horizontal = 24.dp, vertical = 8.dp)
                         ) {
-                            Text(stringResource(R.string.wifi_sim_stop), fontSize = 14.sp)
+                            Text(stringResource(R.string.wifi_sim_start), fontSize = 14.sp)
+                        }
+                    }
+                } else {
+                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        BadgedControl(show = showHelp, number = 4) {
+                            Button(
+                                onClick = onStopSimulating,
+                                colors = ButtonDefaults.buttonColors(containerColor = Color.Red),
+                                shape = RoundedCornerShape(20.dp),
+                                contentPadding = PaddingValues(horizontal = 24.dp, vertical = 8.dp)
+                            ) {
+                                Text(stringResource(R.string.wifi_sim_stop), fontSize = 14.sp)
+                            }
                         }
                     }
                 }
@@ -542,7 +587,9 @@ fun WifiHistoryCard(
     isSimulating: Boolean,
     onToggleSelect: () -> Unit,
     onRename: () -> Unit,
-    onDelete: () -> Unit
+    onDelete: () -> Unit,
+    showHelp: Boolean = false,
+    badgeBase: Int = 0
 ) {
     Card(
         elevation = CardDefaults.cardElevation(defaultElevation = if (isSelected) 3.dp else 1.dp),
@@ -562,55 +609,66 @@ fun WifiHistoryCard(
                 .fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Checkbox(
-                checked = isSelected,
-                onCheckedChange = { onToggleSelect() },
-                enabled = !isSimulating
-            )
+            BadgedControl(show = showHelp, number = badgeBase) {
+                Checkbox(
+                    checked = isSelected,
+                    onCheckedChange = { onToggleSelect() },
+                    enabled = !isSimulating
+                )
+            }
 
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
+            BadgedControl(
+                show = showHelp,
+                number = badgeBase + 1,
                 modifier = Modifier
                     .weight(1f)
                     .clickable(enabled = !isSimulating) { onToggleSelect() }
             ) {
-                Icon(
-                    painter = painterResource(id = R.drawable.ic_wifi),
-                    contentDescription = null,
-                    tint = if (isSelected) MaterialTheme.colorScheme.primary else Color.Gray,
-                    modifier = Modifier.size(20.dp)
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Column {
-                    Text(
-                        text = wifi.name.ifBlank { wifi.ssid },
-                        fontSize = 14.sp,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        fontWeight = if (isSelected) FontWeight.Medium else FontWeight.Normal
+                Row(
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        painter = painterResource(id = R.drawable.ic_wifi),
+                        contentDescription = null,
+                        tint = if (isSelected) MaterialTheme.colorScheme.primary else Color.Gray,
+                        modifier = Modifier.size(20.dp)
                     )
-                    Text(
-                        text = "${wifi.ssid} · ${wifi.bssid}",
-                        fontSize = 11.sp,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
-                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Column {
+                        Text(
+                            text = wifi.name.ifBlank { wifi.ssid },
+                            fontSize = 14.sp,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            fontWeight = if (isSelected) FontWeight.Medium else FontWeight.Normal
+                        )
+                        Text(
+                            text = "${wifi.ssid} · ${wifi.bssid}",
+                            fontSize = 11.sp,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                        )
+                    }
                 }
             }
 
-            IconButton(onClick = onRename, enabled = !isSimulating) {
-                Icon(
-                    Icons.Default.Edit,
-                    contentDescription = stringResource(R.string.wifi_sim_rename),
-                    tint = if (isSimulating) Color.Gray else MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(18.dp)
-                )
+            BadgedControl(show = showHelp, number = badgeBase + 2) {
+                IconButton(onClick = onRename, enabled = !isSimulating) {
+                    Icon(
+                        Icons.Default.Edit,
+                        contentDescription = stringResource(R.string.wifi_sim_rename),
+                        tint = if (isSimulating) Color.Gray else MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
             }
-            IconButton(onClick = onDelete, enabled = !isSimulating) {
-                Icon(
-                    Icons.Default.Delete,
-                    contentDescription = stringResource(R.string.wifi_sim_delete),
-                    tint = if (isSimulating) Color.Gray else Color.Red,
-                    modifier = Modifier.size(18.dp)
-                )
+            BadgedControl(show = showHelp, number = badgeBase + 3) {
+                IconButton(onClick = onDelete, enabled = !isSimulating) {
+                    Icon(
+                        Icons.Default.Delete,
+                        contentDescription = stringResource(R.string.wifi_sim_delete),
+                        tint = if (isSimulating) Color.Gray else Color.Red,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
             }
         }
     }

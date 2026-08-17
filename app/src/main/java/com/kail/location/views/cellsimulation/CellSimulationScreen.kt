@@ -30,6 +30,9 @@ import com.kail.location.R
 import com.kail.location.models.CellInfo
 import com.kail.location.viewmodels.CellSimulationViewModel
 import com.kail.location.views.common.AppDrawer
+import com.kail.location.views.common.BadgedControl
+import com.kail.location.views.common.HelpActionButton
+import com.kail.location.views.common.HelpOverlayScrim
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -50,6 +53,7 @@ fun CellSimulationScreen(
     var showAddDialog by remember { mutableStateOf(false) }
     var editingCell by remember { mutableStateOf<CellInfo?>(null) }
     var showScanResultDialog by remember { mutableStateOf(false) }
+    var showHelp by remember { mutableStateOf(false) }
     val snackbarHostState = remember { SnackbarHostState() }
 
     val drawerState = rememberDrawerState(DrawerValue.Closed)
@@ -98,18 +102,24 @@ fun CellSimulationScreen(
             )
         }
     ) {
+        Box {
         Scaffold(
             topBar = {
                 TopAppBar(
                     title = { Text(stringResource(R.string.cell_sim_title)) },
                     navigationIcon = {
-                        IconButton(onClick = { scope.launch { drawerState.open() } }) {
-                            Icon(
-                                imageVector = Icons.Default.Menu,
-                                contentDescription = "Menu",
-                                tint = Color.White
-                            )
+                        BadgedControl(show = showHelp, number = 1) {
+                            IconButton(onClick = { scope.launch { drawerState.open() } }) {
+                                Icon(
+                                    imageVector = Icons.Default.Menu,
+                                    contentDescription = "Menu",
+                                    tint = Color.White
+                                )
+                            }
                         }
+                    },
+                    actions = {
+                        HelpActionButton(showHelp = showHelp) { showHelp = true }
                     },
                     colors = TopAppBarDefaults.topAppBarColors(
                         containerColor = MaterialTheme.colorScheme.primary,
@@ -119,8 +129,10 @@ fun CellSimulationScreen(
                 )
             },
             floatingActionButton = {
-                FloatingActionButton(onClick = { showAddDialog = true }) {
-                    Icon(Icons.Default.Add, contentDescription = stringResource(R.string.cell_sim_add))
+                BadgedControl(show = showHelp, number = 2) {
+                    FloatingActionButton(onClick = { showAddDialog = true }) {
+                        Icon(Icons.Default.Add, contentDescription = stringResource(R.string.cell_sim_add))
+                    }
                 }
             },
             snackbarHost = { SnackbarHost(snackbarHostState) }
@@ -135,6 +147,7 @@ fun CellSimulationScreen(
                 CellTargetCard(
                     activeList = activeList,
                     isSimulating = isSimulating,
+                    showHelp = showHelp,
                     onStartSimulating = { viewModel.setSimulating(true) },
                     onStopSimulating = { viewModel.setSimulating(false) },
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 16.dp)
@@ -178,51 +191,57 @@ fun CellSimulationScreen(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    TextButton(
-                        onClick = {
-                            viewModel.scanCurrentCellInfo()
-                            showScanResultDialog = true
-                        },
-                        enabled = !isSimulating
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Search,
-                            contentDescription = null,
-                            modifier = Modifier.size(16.dp)
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(stringResource(R.string.cell_sim_scan_current), fontSize = 12.sp)
-                    }
-                    TextButton(
-                        onClick = {
-                            viewModel.fetchCellsFromNetwork()
-                            showScanResultDialog = true
-                        },
-                        enabled = !isFetchingNetwork && !isSimulating
-                    ) {
-                        if (isFetchingNetwork) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(14.dp),
-                                color = MaterialTheme.colorScheme.primary,
-                                strokeWidth = 2.dp
+                    BadgedControl(show = showHelp, number = 3) {
+                        TextButton(
+                            onClick = {
+                                viewModel.scanCurrentCellInfo()
+                                showScanResultDialog = true
+                            },
+                            enabled = !isSimulating
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Search,
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp)
                             )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(stringResource(R.string.cell_sim_scan_current), fontSize = 12.sp)
                         }
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(stringResource(R.string.cell_sim_fetch_network), fontSize = 12.sp)
+                    }
+                    BadgedControl(show = showHelp, number = 4) {
+                        TextButton(
+                            onClick = {
+                                viewModel.fetchCellsFromNetwork()
+                                showScanResultDialog = true
+                            },
+                            enabled = !isFetchingNetwork && !isSimulating
+                        ) {
+                            if (isFetchingNetwork) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(14.dp),
+                                    color = MaterialTheme.colorScheme.primary,
+                                    strokeWidth = 2.dp
+                                )
+                            }
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(stringResource(R.string.cell_sim_fetch_network), fontSize = 12.sp)
+                        }
                     }
                 }
                 if (cellList.isNotEmpty()) {
-                    TextButton(
-                        onClick = {
-                            if (selectedIds.size == cellList.size) viewModel.deselectAll()
-                            else viewModel.selectAll()
-                        },
-                        enabled = !isSimulating
-                    ) {
-                        Text(
-                            if (selectedIds.size == cellList.size) stringResource(R.string.cell_sim_deselect_all) else stringResource(R.string.cell_sim_select_all),
-                            fontSize = 12.sp
-                        )
+                    BadgedControl(show = showHelp, number = 5) {
+                        TextButton(
+                            onClick = {
+                                if (selectedIds.size == cellList.size) viewModel.deselectAll()
+                                else viewModel.selectAll()
+                            },
+                            enabled = !isSimulating
+                        ) {
+                            Text(
+                                if (selectedIds.size == cellList.size) stringResource(R.string.cell_sim_deselect_all) else stringResource(R.string.cell_sim_select_all),
+                                fontSize = 12.sp
+                            )
+                        }
                     }
                 }
             }
@@ -257,6 +276,7 @@ fun CellSimulationScreen(
                             cell = cell,
                             isSelected = isSelected,
                             isSimulating = isSimulating,
+                            showHelp = showHelp,
                             onToggleSelect = { viewModel.toggleSelection(cell.id) },
                             onEdit = { editingCell = cell },
                             onDelete = { viewModel.deleteCell(cell.id) }
@@ -265,6 +285,23 @@ fun CellSimulationScreen(
                 }
             }
         }
+    }
+    HelpOverlayScrim(
+        showHelp = showHelp,
+        entries = listOf(
+            1 to R.string.help_cell_sim_menu,
+            2 to R.string.help_cell_sim_add,
+            3 to R.string.help_cell_sim_scan_current,
+            4 to R.string.help_cell_sim_fetch_network,
+            5 to R.string.help_cell_sim_select_all,
+            6 to R.string.help_cell_sim_start_stop,
+            7 to R.string.help_cell_sim_toggle_select,
+            8 to R.string.help_cell_sim_toggle_select_row,
+            9 to R.string.help_cell_sim_edit,
+            10 to R.string.help_cell_sim_delete
+        ),
+        onDismiss = { showHelp = false }
+    )
     }
 }
 
@@ -311,6 +348,7 @@ fun CellSimulationScreen(
 fun CellTargetCard(
     activeList: List<CellInfo>,
     isSimulating: Boolean,
+    showHelp: Boolean = false,
     onStartSimulating: () -> Unit,
     onStopSimulating: () -> Unit,
     modifier: Modifier = Modifier
@@ -369,23 +407,27 @@ fun CellTargetCard(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 if (!isSimulating) {
-                    Button(
-                        onClick = onStartSimulating,
-                        enabled = activeList.isNotEmpty(),
-                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
-                        shape = RoundedCornerShape(20.dp),
-                        contentPadding = PaddingValues(horizontal = 24.dp, vertical = 8.dp)
-                    ) {
-                        Text(stringResource(R.string.cell_sim_start), fontSize = 14.sp)
+                    BadgedControl(show = showHelp, number = 6) {
+                        Button(
+                            onClick = onStartSimulating,
+                            enabled = activeList.isNotEmpty(),
+                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+                            shape = RoundedCornerShape(20.dp),
+                            contentPadding = PaddingValues(horizontal = 24.dp, vertical = 8.dp)
+                        ) {
+                            Text(stringResource(R.string.cell_sim_start), fontSize = 14.sp)
+                        }
                     }
                 } else {
-                    Button(
-                        onClick = onStopSimulating,
-                        colors = ButtonDefaults.buttonColors(containerColor = Color.Red),
-                        shape = RoundedCornerShape(20.dp),
-                        contentPadding = PaddingValues(horizontal = 24.dp, vertical = 8.dp)
-                    ) {
-                        Text(stringResource(R.string.cell_sim_stop), fontSize = 14.sp)
+                    BadgedControl(show = showHelp, number = 6) {
+                        Button(
+                            onClick = onStopSimulating,
+                            colors = ButtonDefaults.buttonColors(containerColor = Color.Red),
+                            shape = RoundedCornerShape(20.dp),
+                            contentPadding = PaddingValues(horizontal = 24.dp, vertical = 8.dp)
+                        ) {
+                            Text(stringResource(R.string.cell_sim_stop), fontSize = 14.sp)
+                        }
                     }
                 }
 
@@ -413,6 +455,7 @@ fun CellHistoryCard(
     cell: CellInfo,
     isSelected: Boolean,
     isSimulating: Boolean,
+    showHelp: Boolean = false,
     onToggleSelect: () -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit
@@ -435,48 +478,54 @@ fun CellHistoryCard(
                 .fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Checkbox(
-                checked = isSelected,
-                onCheckedChange = { onToggleSelect() },
-                enabled = !isSimulating
-            )
+            BadgedControl(show = showHelp, number = 7) {
+                Checkbox(
+                    checked = isSelected,
+                    onCheckedChange = { onToggleSelect() },
+                    enabled = !isSimulating
+                )
+            }
 
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier
-                    .weight(1f)
-                    .clickable(enabled = !isSimulating) { onToggleSelect() }
-            ) {
-                Column {
-                    Text(
-                        text = "${cell.networkType} - ${cell.cid}",
-                        fontSize = 14.sp,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        fontWeight = if (isSelected) FontWeight.Medium else FontWeight.Normal
-                    )
-                    Text(
-                        text = "MCC: ${cell.mcc} MNC: ${cell.mnc} LAC: ${cell.lac} PSC: ${cell.psc}",
-                        fontSize = 11.sp,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
-                    )
+            BadgedControl(show = showHelp, number = 8, modifier = Modifier.weight(1f)) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.clickable(enabled = !isSimulating) { onToggleSelect() }
+                ) {
+                    Column {
+                        Text(
+                            text = "${cell.networkType} - ${cell.cid}",
+                            fontSize = 14.sp,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            fontWeight = if (isSelected) FontWeight.Medium else FontWeight.Normal
+                        )
+                        Text(
+                            text = "MCC: ${cell.mcc} MNC: ${cell.mnc} LAC: ${cell.lac} PSC: ${cell.psc}",
+                            fontSize = 11.sp,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                        )
+                    }
                 }
             }
 
-            IconButton(onClick = onEdit, enabled = !isSimulating) {
-                Icon(
-                    Icons.Default.Edit,
-                    contentDescription = stringResource(R.string.cell_sim_edit),
-                    tint = if (isSimulating) Color.Gray else MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(18.dp)
-                )
+            BadgedControl(show = showHelp, number = 9) {
+                IconButton(onClick = onEdit, enabled = !isSimulating) {
+                    Icon(
+                        Icons.Default.Edit,
+                        contentDescription = stringResource(R.string.cell_sim_edit),
+                        tint = if (isSimulating) Color.Gray else MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
             }
-            IconButton(onClick = onDelete, enabled = !isSimulating) {
-                Icon(
-                    Icons.Default.Delete,
-                    contentDescription = stringResource(R.string.cell_sim_delete),
-                    tint = if (isSimulating) Color.Gray else Color.Red,
-                    modifier = Modifier.size(18.dp)
-                )
+            BadgedControl(show = showHelp, number = 10) {
+                IconButton(onClick = onDelete, enabled = !isSimulating) {
+                    Icon(
+                        Icons.Default.Delete,
+                        contentDescription = stringResource(R.string.cell_sim_delete),
+                        tint = if (isSimulating) Color.Gray else Color.Red,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
             }
         }
     }

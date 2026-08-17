@@ -26,6 +26,9 @@ import androidx.compose.ui.window.Dialog
 import com.kail.location.R
 import com.kail.location.viewmodels.IndependentSimulationViewModel
 import com.kail.location.views.common.AppDrawer
+import com.kail.location.views.common.BadgedControl
+import com.kail.location.views.common.HelpActionButton
+import com.kail.location.views.common.HelpOverlayScrim
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -53,6 +56,7 @@ fun IndependentSimulationScreen(
     val targetPackages by viewModel.targetPackages.collectAsState()
 
     var showAppPicker by remember { mutableStateOf(false) }
+    var showHelp by remember { mutableStateOf(false) }
     var selectedPackages by remember {
         mutableStateOf(targetPackages.split(",").map { it.trim() }.filter { it.isNotEmpty() }.toSet())
     }
@@ -83,23 +87,30 @@ fun IndependentSimulationScreen(
             )
         }
     ) {
+        Box {
         Scaffold(
             topBar = {
                 TopAppBar(
                     title = { Text(stringResource(R.string.ind_sim_title)) },
                     navigationIcon = {
-                        IconButton(onClick = { scope.launch { drawerState.open() } }) {
-                            Icon(
-                                Icons.Default.Menu,
-                                contentDescription = "Menu",
-                                tint = Color.White
-                            )
+                        BadgedControl(show = showHelp, number = 1) {
+                            IconButton(onClick = { scope.launch { drawerState.open() } }) {
+                                Icon(
+                                    Icons.Default.Menu,
+                                    contentDescription = "Menu",
+                                    tint = Color.White
+                                )
+                            }
                         }
+                    },
+                    actions = {
+                        HelpActionButton(showHelp = showHelp) { showHelp = true }
                     },
                     colors = TopAppBarDefaults.topAppBarColors(
                         containerColor = MaterialTheme.colorScheme.primary,
                         titleContentColor = Color.White,
-                        navigationIconContentColor = Color.White
+                        navigationIconContentColor = Color.White,
+                        actionIconContentColor = Color.White
                     )
                 )
             }
@@ -134,56 +145,60 @@ fun IndependentSimulationScreen(
             Spacer(modifier = Modifier.height(16.dp))
 
             // Target Apps
-            OutlinedCard(
-                modifier = Modifier.fillMaxWidth(),
-                onClick = { showAppPicker = true }
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+            BadgedControl(show = showHelp, number = 2, modifier = Modifier.fillMaxWidth()) {
+                OutlinedCard(
+                    modifier = Modifier.fillMaxWidth(),
+                    onClick = { showAppPicker = true }
                 ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = stringResource(R.string.ind_sim_target_apps),
-                            style = MaterialTheme.typography.titleSmall
-                        )
-                        Text(
-                            text = if (selectedPackages.isEmpty())
-                                stringResource(R.string.ind_sim_target_apps_hint)
-                            else
-                                stringResource(R.string.ind_sim_selected_count, selectedPackages.size),
-                            style = MaterialTheme.typography.bodySmall,
-                            modifier = Modifier.padding(top = 4.dp)
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = stringResource(R.string.ind_sim_target_apps),
+                                style = MaterialTheme.typography.titleSmall
+                            )
+                            Text(
+                                text = if (selectedPackages.isEmpty())
+                                    stringResource(R.string.ind_sim_target_apps_hint)
+                                else
+                                    stringResource(R.string.ind_sim_selected_count, selectedPackages.size),
+                                style = MaterialTheme.typography.bodySmall,
+                                modifier = Modifier.padding(top = 4.dp)
+                            )
+                        }
+                        Icon(
+                            imageVector = Icons.Default.Check,
+                            contentDescription = null,
+                            tint = if (selectedPackages.isNotEmpty()) MaterialTheme.colorScheme.primary else Color.Gray
                         )
                     }
-                    Icon(
-                        imageVector = Icons.Default.Check,
-                        contentDescription = null,
-                        tint = if (selectedPackages.isNotEmpty()) MaterialTheme.colorScheme.primary else Color.Gray
-                    )
                 }
             }
 
             Spacer(modifier = Modifier.height(32.dp))
 
             // Start/Stop Button
-            Button(
-                onClick = {
-                    if (!isEnabled && selectedPackages.isEmpty()) return@Button
-                    viewModel.setEnabled(!isEnabled)
-                },
-                modifier = Modifier.fillMaxWidth(),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = if (isEnabled) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
-                ),
-                enabled = isEnabled || selectedPackages.isNotEmpty()
-            ) {
-                Text(
-                    text = if (isEnabled) stringResource(R.string.ind_sim_stop_btn) else stringResource(R.string.ind_sim_start_btn)
-                )
+            BadgedControl(show = showHelp, number = 3, modifier = Modifier.fillMaxWidth()) {
+                Button(
+                    onClick = {
+                        if (!isEnabled && selectedPackages.isEmpty()) return@Button
+                        viewModel.setEnabled(!isEnabled)
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (isEnabled) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
+                    ),
+                    enabled = isEnabled || selectedPackages.isNotEmpty()
+                ) {
+                    Text(
+                        text = if (isEnabled) stringResource(R.string.ind_sim_stop_btn) else stringResource(R.string.ind_sim_start_btn)
+                    )
+                }
             }
 
             if (!isEnabled && selectedPackages.isEmpty()) {
@@ -207,6 +222,16 @@ fun IndependentSimulationScreen(
             }
         }
     }
+        HelpOverlayScrim(
+            showHelp = showHelp,
+            entries = listOf(
+                1 to R.string.help_ind_sim_menu,
+                2 to R.string.help_ind_sim_target_apps,
+                3 to R.string.help_ind_sim_toggle
+            ),
+            onDismiss = { showHelp = false }
+        )
+        }
     }
 }
 

@@ -24,6 +24,9 @@ import androidx.compose.ui.unit.sp
 import com.kail.location.models.HistoryRecord
 import com.kail.location.viewmodels.HistoryViewModel
 import com.kail.location.R
+import com.kail.location.views.common.BadgedControl
+import com.kail.location.views.common.HelpActionButton
+import com.kail.location.views.common.HelpOverlayScrim
 
 /**
  * 历史记录屏幕组合项。
@@ -47,19 +50,26 @@ fun HistoryScreen(
     var showDeleteAllDialog by remember { mutableStateOf(false) }
     var itemToDelete by remember { mutableStateOf<HistoryRecord?>(null) }
     var itemToEdit by remember { mutableStateOf<HistoryRecord?>(null) }
+    var showHelp by remember { mutableStateOf(false) }
 
+    Box {
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { Text(stringResource(R.string.history_title)) },
                 navigationIcon = {
-                    IconButton(onClick = onBackClick) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                    BadgedControl(show = showHelp, number = 1) {
+                        IconButton(onClick = onBackClick) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                        }
                     }
                 },
                 actions = {
-                    IconButton(onClick = { showDeleteAllDialog = true }) {
-                        Icon(Icons.Default.Delete, contentDescription = "Delete All")
+                    HelpActionButton(showHelp = showHelp) { showHelp = true }
+                    BadgedControl(show = showHelp, number = 2) {
+                        IconButton(onClick = { showDeleteAllDialog = true }) {
+                            Icon(Icons.Default.Delete, contentDescription = "Delete All")
+                        }
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -87,8 +97,10 @@ fun HistoryScreen(
                 leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
                 trailingIcon = {
                     if (searchQuery.isNotEmpty()) {
-                        IconButton(onClick = { viewModel.setSearchQuery("") }) {
-                            Icon(Icons.Default.Clear, contentDescription = "Clear")
+                        BadgedControl(show = showHelp, number = 3) {
+                            IconButton(onClick = { viewModel.setSearchQuery("") }) {
+                                Icon(Icons.Default.Clear, contentDescription = "Clear")
+                            }
                         }
                     }
                 },
@@ -111,20 +123,33 @@ fun HistoryScreen(
                     modifier = Modifier.fillMaxSize()
                 ) {
                     items(historyRecords, key = { it.id }) { record ->
-                        HistoryItem(
-                            record = record,
-                            onClick = {
-                                val (lon, lat) = viewModel.getFinalCoordinates(record)
-                                onLocationSelect(record.name, lon, lat)
-                            },
-                            onDeleteClick = { itemToDelete = record },
-                            onEditClick = { itemToEdit = record }
-                        )
+                        BadgedControl(show = showHelp, number = 4) {
+                            HistoryItem(
+                                record = record,
+                                onClick = {
+                                    val (lon, lat) = viewModel.getFinalCoordinates(record)
+                                    onLocationSelect(record.name, lon, lat)
+                                },
+                                onDeleteClick = { itemToDelete = record },
+                                onEditClick = { itemToEdit = record }
+                            )
+                        }
                         HorizontalDivider()
                     }
                 }
             }
         }
+    }
+        HelpOverlayScrim(
+            showHelp = showHelp,
+            entries = listOf(
+                1 to R.string.help_history_back,
+                2 to R.string.help_history_delete_all,
+                3 to R.string.help_history_clear_search,
+                4 to R.string.help_history_item
+            ),
+            onDismiss = { showHelp = false }
+        )
     }
 
     if (showDeleteAllDialog) {

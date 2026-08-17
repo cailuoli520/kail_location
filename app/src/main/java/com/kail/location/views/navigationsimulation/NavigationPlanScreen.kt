@@ -36,6 +36,9 @@ import com.kail.location.R
 import com.kail.location.utils.KailLog
 import com.kail.location.utils.MapUtils
 import com.kail.location.viewmodels.NavigationSimulationViewModel
+import com.kail.location.views.common.BadgedControl
+import com.kail.location.views.common.HelpActionButton
+import com.kail.location.views.common.HelpOverlayScrim
 import com.kail.location.views.routesimulation.WaypointWaitDialog
 import com.kail.location.views.routesimulation.buildWaitBadgeBitmap
 import android.graphics.Color as AndroidColor
@@ -81,6 +84,7 @@ fun NavigationPlanScreen(
     var showWaitDialog by remember { mutableStateOf(false) }
     var isSearchActive by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
+    var showHelp by remember { mutableStateOf(false) }
     val searchResults by viewModel.searchResults.collectAsState()
 
     fun nearestIndex(target: LatLng): Int {
@@ -190,24 +194,30 @@ fun NavigationPlanScreen(
         )
     }
 
+    Box {
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { Text(stringResource(R.string.nav_sim_plan_title), color = Color.White) },
                 navigationIcon = {
-                    IconButton(onClick = onBackClick) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = Color.White)
+                    BadgedControl(show = showHelp, number = 1) {
+                        IconButton(onClick = onBackClick) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = Color.White)
+                        }
                     }
                 },
                 actions = {
-                    IconButton(onClick = {
-                        isSearchActive = !isSearchActive
-                        if (!isSearchActive) {
-                            searchQuery = ""
-                            viewModel.clearSearchResults()
+                    HelpActionButton(showHelp = showHelp) { showHelp = true }
+                    BadgedControl(show = showHelp, number = 2) {
+                        IconButton(onClick = {
+                            isSearchActive = !isSearchActive
+                            if (!isSearchActive) {
+                                searchQuery = ""
+                                viewModel.clearSearchResults()
+                            }
+                        }) {
+                            Icon(Icons.Default.Search, contentDescription = "Search", tint = Color.White)
                         }
-                    }) {
-                        Icon(Icons.Default.Search, contentDescription = "Search", tint = Color.White)
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -239,11 +249,17 @@ fun NavigationPlanScreen(
                     .align(Alignment.CenterEnd)
                     .padding(end = 8.dp)
             ) {
-                NavPlanMapButton(R.drawable.ic_home_position) { onLocateClick?.invoke() }
+                BadgedControl(show = showHelp, number = 3) {
+                    NavPlanMapButton(R.drawable.ic_home_position) { onLocateClick?.invoke() }
+                }
                 Spacer(modifier = Modifier.height(16.dp))
-                NavPlanMapButton(R.drawable.ic_zoom_in) { mapView?.map?.setMapStatus(MapStatusUpdateFactory.zoomIn()) }
+                BadgedControl(show = showHelp, number = 4) {
+                    NavPlanMapButton(R.drawable.ic_zoom_in) { mapView?.map?.setMapStatus(MapStatusUpdateFactory.zoomIn()) }
+                }
                 Spacer(modifier = Modifier.height(16.dp))
-                NavPlanMapButton(R.drawable.ic_zoom_out) { mapView?.map?.setMapStatus(MapStatusUpdateFactory.zoomOut()) }
+                BadgedControl(show = showHelp, number = 5) {
+                    NavPlanMapButton(R.drawable.ic_zoom_out) { mapView?.map?.setMapStatus(MapStatusUpdateFactory.zoomOut()) }
+                }
             }
 
             // Bottom-right FABs
@@ -253,98 +269,106 @@ fun NavigationPlanScreen(
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 // Undo: 先撤等待点，再撤起点/终点
-                SmallFloatingActionButton(
-                    onClick = {
-                        when {
-                            waitPoints.isNotEmpty() -> {
-                                waitPoints.removeAt(waitPoints.lastIndex)
-                                waitSecs.removeAt(waitSecs.lastIndex)
-                                redraw()
+                BadgedControl(show = showHelp, number = 6) {
+                    SmallFloatingActionButton(
+                        onClick = {
+                            when {
+                                waitPoints.isNotEmpty() -> {
+                                    waitPoints.removeAt(waitPoints.lastIndex)
+                                    waitSecs.removeAt(waitSecs.lastIndex)
+                                    redraw()
+                                }
+                                waypoints.isNotEmpty() -> {
+                                    waypoints.removeAt(waypoints.lastIndex)
+                                    redraw()
+                                }
                             }
-                            waypoints.isNotEmpty() -> {
-                                waypoints.removeAt(waypoints.lastIndex)
-                                redraw()
-                            }
-                        }
-                    },
-                    modifier = Modifier.alpha(if (waypoints.isNotEmpty() || waitPoints.isNotEmpty()) 1f else 0f),
-                    containerColor = Color.White,
-                    contentColor = MaterialTheme.colorScheme.primary
-                ) {
-                    Icon(painter = painterResource(id = R.drawable.ic_left), contentDescription = null)
+                        },
+                        modifier = Modifier.alpha(if (waypoints.isNotEmpty() || waitPoints.isNotEmpty()) 1f else 0f),
+                        containerColor = Color.White,
+                        contentColor = MaterialTheme.colorScheme.primary
+                    ) {
+                        Icon(painter = painterResource(id = R.drawable.ic_left), contentDescription = null)
+                    }
                 }
 
                 // Wait time for the latest wait point
-                FloatingActionButton(
-                    onClick = { if (waitPoints.isNotEmpty()) showWaitDialog = true },
-                    containerColor = if (showWaitDialog) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface,
-                    shape = CircleShape,
-                    modifier = Modifier.alpha(if (waitPoints.isNotEmpty()) 1f else 0f)
-                ) {
-                    Text(
-                        text = stringResource(R.string.route_plan_wait_btn),
-                        color = if (showWaitDialog) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.secondary,
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Bold
-                    )
+                BadgedControl(show = showHelp, number = 7) {
+                    FloatingActionButton(
+                        onClick = { if (waitPoints.isNotEmpty()) showWaitDialog = true },
+                        containerColor = if (showWaitDialog) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface,
+                        shape = CircleShape,
+                        modifier = Modifier.alpha(if (waitPoints.isNotEmpty()) 1f else 0f)
+                    ) {
+                        Text(
+                            text = stringResource(R.string.route_plan_wait_btn),
+                            color = if (showWaitDialog) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.secondary,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
                 }
 
                 // Drop point: 1st tap = start, 2nd = end, then wait points snapped to the line
-                FloatingActionButton(
-                    onClick = {
-                        val center = mapView?.map?.mapStatus?.target ?: return@FloatingActionButton
-                        when {
-                            waypoints.isEmpty() -> {
-                                waypoints.add(center)
-                                redraw()
-                                KailLog.i(context, "NavigationPlanScreen", "start -> $center")
-                            }
-                            waypoints.size == 1 -> {
-                                waypoints.add(center)
-                                redraw()
-                                KailLog.i(context, "NavigationPlanScreen", "end -> $center")
-                            }
-                            route != null && route.size >= 2 -> {
-                                val idx = nearestIndex(center)
-                                if (idx >= 0) {
-                                    waitPoints.add(route[idx])
-                                    waitSecs.add(0)
+                BadgedControl(show = showHelp, number = 8) {
+                    FloatingActionButton(
+                        onClick = {
+                            val center = mapView?.map?.mapStatus?.target ?: return@FloatingActionButton
+                            when {
+                                waypoints.isEmpty() -> {
+                                    waypoints.add(center)
                                     redraw()
-                                    KailLog.i(context, "NavigationPlanScreen", "wait point snapped to route[$idx]")
+                                    KailLog.i(context, "NavigationPlanScreen", "start -> $center")
+                                }
+                                waypoints.size == 1 -> {
+                                    waypoints.add(center)
+                                    redraw()
+                                    KailLog.i(context, "NavigationPlanScreen", "end -> $center")
+                                }
+                                route != null && route.size >= 2 -> {
+                                    val idx = nearestIndex(center)
+                                    if (idx >= 0) {
+                                        waitPoints.add(route[idx])
+                                        waitSecs.add(0)
+                                        redraw()
+                                        KailLog.i(context, "NavigationPlanScreen", "wait point snapped to route[$idx]")
+                                    }
                                 }
                             }
-                        }
-                    },
-                    containerColor = MaterialTheme.colorScheme.primaryContainer,
-                    shape = CircleShape
-                ) {
-                    Icon(
-                        painter = painterResource(id = R.drawable.ic_position),
-                        contentDescription = "Drop Point",
-                        tint = MaterialTheme.colorScheme.onPrimaryContainer
-                    )
+                        },
+                        containerColor = MaterialTheme.colorScheme.primaryContainer,
+                        shape = CircleShape
+                    ) {
+                        Icon(
+                            painter = painterResource(id = R.drawable.ic_position),
+                            contentDescription = "Drop Point",
+                            tint = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
+                    }
                 }
 
                 // Confirm
-                FloatingActionButton(
-                    onClick = {
-                        if (waypoints.size >= 2) {
-                            val waitsMap = mutableMapOf<Int, Int>()
-                            waitPoints.forEachIndexed { i, p ->
-                                val idx = nearestIndex(p)
-                                if (idx >= 0) waitsMap[idx] = waitSecs[i]
+                BadgedControl(show = showHelp, number = 9) {
+                    FloatingActionButton(
+                        onClick = {
+                            if (waypoints.size >= 2) {
+                                val waitsMap = mutableMapOf<Int, Int>()
+                                waitPoints.forEachIndexed { i, p ->
+                                    val idx = nearestIndex(p)
+                                    if (idx >= 0) waitsMap[idx] = waitSecs[i]
+                                }
+                                onConfirmClick(waypoints[0], waypoints[1], waitsMap)
                             }
-                            onConfirmClick(waypoints[0], waypoints[1], waitsMap)
-                        }
-                    },
-                    containerColor = if (waypoints.size >= 2) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.surface,
-                    modifier = Modifier.alpha(if (waypoints.size >= 2) 1f else 0.35f)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Check,
-                        contentDescription = null,
-                        tint = if (waypoints.size >= 2) Color.White else MaterialTheme.colorScheme.onSurface
-                    )
+                        },
+                        containerColor = if (waypoints.size >= 2) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.surface,
+                        modifier = Modifier.alpha(if (waypoints.size >= 2) 1f else 0.35f)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Check,
+                            contentDescription = null,
+                            tint = if (waypoints.size >= 2) Color.White else MaterialTheme.colorScheme.onSurface
+                        )
+                    }
                 }
             }
 
@@ -369,11 +393,13 @@ fun NavigationPlanScreen(
                             singleLine = true,
                             trailingIcon = {
                                 if (searchQuery.isNotEmpty()) {
-                                    IconButton(onClick = {
-                                        searchQuery = ""
-                                        viewModel.clearSearchResults()
-                                    }) {
-                                        Icon(Icons.Default.Close, contentDescription = "Clear")
+                                    BadgedControl(show = showHelp, number = 10) {
+                                        IconButton(onClick = {
+                                            searchQuery = ""
+                                            viewModel.clearSearchResults()
+                                        }) {
+                                            Icon(Icons.Default.Close, contentDescription = "Clear")
+                                        }
                                     }
                                 }
                             },
@@ -385,22 +411,24 @@ fun NavigationPlanScreen(
                                     val item = searchResults[index]
                                     val name = item[NavigationSimulationViewModel.POI_NAME].toString()
                                     val address = item[NavigationSimulationViewModel.POI_ADDRESS].toString()
-                                    ListItem(
-                                        headlineContent = { Text(name) },
-                                        supportingContent = { Text(address) },
-                                        modifier = Modifier.clickable {
-                                            val lat = item[NavigationSimulationViewModel.POI_LATITUDE] as Double
-                                            val lng = item[NavigationSimulationViewModel.POI_LONGITUDE] as Double
-                                            if (waypoints.size < 2) {
-                                                waypoints.add(LatLng(lat, lng))
-                                                redraw()
-                                                mapView?.map?.animateMapStatus(MapStatusUpdateFactory.newLatLng(LatLng(lat, lng)))
+                                    BadgedControl(show = showHelp, number = 11) {
+                                        ListItem(
+                                            headlineContent = { Text(name) },
+                                            supportingContent = { Text(address) },
+                                            modifier = Modifier.clickable {
+                                                val lat = item[NavigationSimulationViewModel.POI_LATITUDE] as Double
+                                                val lng = item[NavigationSimulationViewModel.POI_LONGITUDE] as Double
+                                                if (waypoints.size < 2) {
+                                                    waypoints.add(LatLng(lat, lng))
+                                                    redraw()
+                                                    mapView?.map?.animateMapStatus(MapStatusUpdateFactory.newLatLng(LatLng(lat, lng)))
+                                                }
+                                                isSearchActive = false
+                                                searchQuery = ""
+                                                viewModel.clearSearchResults()
                                             }
-                                            isSearchActive = false
-                                            searchQuery = ""
-                                            viewModel.clearSearchResults()
-                                        }
-                                    )
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -408,6 +436,24 @@ fun NavigationPlanScreen(
                 }
             }
         }
+    }
+        HelpOverlayScrim(
+            showHelp = showHelp,
+            entries = listOf(
+                1 to R.string.help_nav_plan_back,
+                2 to R.string.help_nav_plan_search,
+                3 to R.string.help_nav_plan_locate,
+                4 to R.string.help_nav_plan_zoom_in,
+                5 to R.string.help_nav_plan_zoom_out,
+                6 to R.string.help_nav_plan_undo,
+                7 to R.string.help_nav_plan_wait,
+                8 to R.string.help_nav_plan_drop,
+                9 to R.string.help_nav_plan_confirm,
+                10 to R.string.help_nav_plan_clear,
+                11 to R.string.help_nav_plan_result
+            ),
+            onDismiss = { showHelp = false }
+        )
     }
 }
 

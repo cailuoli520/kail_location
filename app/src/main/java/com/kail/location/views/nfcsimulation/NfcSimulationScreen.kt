@@ -27,6 +27,9 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.sp
 import com.kail.location.R
 import com.kail.location.views.common.AppDrawer
+import com.kail.location.views.common.BadgedControl
+import com.kail.location.views.common.HelpActionButton
+import com.kail.location.views.common.HelpOverlayScrim
 import android.widget.Toast
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
@@ -69,6 +72,7 @@ fun NfcSimulationScreen(
     var packageInput by remember { mutableStateOf("") }
     var showRenameDialog by remember { mutableStateOf<Long?>(null) }
     var renameText by remember { mutableStateOf("") }
+    var showHelp by remember { mutableStateOf(false) }
     
     // Auto-fill input fields from ViewModel
     // Use scanCount to force update on each scan
@@ -141,18 +145,24 @@ fun NfcSimulationScreen(
             )
         }
     ) {
+        Box {
         Scaffold(
             topBar = {
                 TopAppBar(
                     title = { Text(stringResource(R.string.nfc_sim_title)) },
                     navigationIcon = {
-                        IconButton(onClick = { scope.launch { drawerState.animateTo(DrawerValue.Open, androidx.compose.animation.core.tween(durationMillis = 160)) } }) {
-                            Icon(
-                                imageVector = Icons.Default.Menu,
-                                contentDescription = "Menu",
-                                tint = Color.White
-                            )
+                        BadgedControl(show = showHelp, number = 1) {
+                            IconButton(onClick = { scope.launch { drawerState.animateTo(DrawerValue.Open, androidx.compose.animation.core.tween(durationMillis = 160)) } }) {
+                                Icon(
+                                    imageVector = Icons.Default.Menu,
+                                    contentDescription = "Menu",
+                                    tint = Color.White
+                                )
+                            }
                         }
+                    },
+                    actions = {
+                        HelpActionButton(showHelp = showHelp) { showHelp = true }
                     },
                     colors = TopAppBarDefaults.topAppBarColors(
                         containerColor = MaterialTheme.colorScheme.primary,
@@ -229,8 +239,10 @@ fun NfcSimulationScreen(
                                             color = Color(0xFF4CAF50)
                                         )
                                     }
-                                    TextButton(onClick = { viewModel.clearTag() }) {
-                                        Text(stringResource(R.string.nfc_sim_clear), color = Color.Red)
+                                    BadgedControl(show = showHelp, number = 2) {
+                                        TextButton(onClick = { viewModel.clearTag() }) {
+                                            Text(stringResource(R.string.nfc_sim_clear), color = Color.Red)
+                                        }
                                     }
                                 }
                                 Spacer(modifier = Modifier.height(8.dp))
@@ -290,19 +302,21 @@ fun NfcSimulationScreen(
                             
                             Spacer(modifier = Modifier.height(16.dp))
                             
-                            Button(
-                                onClick = {
-                                    viewModel.updateMockUrl(urlInput)
-                                    viewModel.updateMockPackageName(packageInput)
-                                    viewModel.sendMockNfc(context)
-                                },
-                                modifier = Modifier.fillMaxWidth(),
-                                shape = RoundedCornerShape(8.dp),
-                                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
-                            ) {
-                                Icon(imageVector = Icons.Default.Send, contentDescription = null)
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text(stringResource(R.string.nfc_sim_send))
+                            BadgedControl(show = showHelp, number = 3) {
+                                Button(
+                                    onClick = {
+                                        viewModel.updateMockUrl(urlInput)
+                                        viewModel.updateMockPackageName(packageInput)
+                                        viewModel.sendMockNfc(context)
+                                    },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    shape = RoundedCornerShape(8.dp),
+                                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                                ) {
+                                    Icon(imageVector = Icons.Default.Send, contentDescription = null)
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(stringResource(R.string.nfc_sim_send))
+                                }
                             }
                         }
                     }
@@ -323,8 +337,10 @@ fun NfcSimulationScreen(
                             fontSize = 16.sp
                         )
                         if (historyRecords.isNotEmpty()) {
-                            TextButton(onClick = { viewModel.clearHistory() }) {
-                                Text(stringResource(R.string.nfc_sim_clear_history), color = Color.Red)
+                            BadgedControl(show = showHelp, number = 4) {
+                                TextButton(onClick = { viewModel.clearHistory() }) {
+                                    Text(stringResource(R.string.nfc_sim_clear_history), color = Color.Red)
+                                }
                             }
                         }
                     }
@@ -348,64 +364,72 @@ fun NfcSimulationScreen(
                     }
                 } else {
                     items(historyRecords) { item ->
-                        Card(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 16.dp, vertical = 4.dp)
-                                .clickable { viewModel.applyFromHistory(item) },
-                            shape = RoundedCornerShape(12.dp)
-                        ) {
-                            Row(
+                        BadgedControl(show = showHelp, number = 5) {
+                            Card(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(12.dp),
-                                verticalAlignment = Alignment.CenterVertically
+                                    .padding(horizontal = 16.dp, vertical = 4.dp)
+                                    .clickable { viewModel.applyFromHistory(item) },
+                                shape = RoundedCornerShape(12.dp)
                             ) {
-                                Column(modifier = Modifier.weight(1f)) {
-                                    if (item.name.isNotBlank()) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(12.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        if (item.name.isNotBlank()) {
+                                            Text(
+                                                text = item.name,
+                                                fontSize = 14.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = MaterialTheme.colorScheme.primary
+                                            )
+                                        }
                                         Text(
-                                            text = item.name,
+                                            text = item.content,
                                             fontSize = 14.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            color = MaterialTheme.colorScheme.primary
+                                            maxLines = 2,
+                                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = if (item.name.isNotBlank()) 0.6f else 0.87f)
+                                        )
+                                        Text(
+                                            text = "${item.type} • ${formatTime(item.timestamp)}",
+                                            fontSize = 12.sp,
+                                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                                         )
                                     }
-                                    Text(
-                                        text = item.content,
-                                        fontSize = 14.sp,
-                                        maxLines = 2,
-                                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = if (item.name.isNotBlank()) 0.6f else 0.87f)
-                                    )
-                                    Text(
-                                        text = "${item.type} • ${formatTime(item.timestamp)}",
-                                        fontSize = 12.sp,
-                                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-                                    )
-                                }
-                                IconButton(onClick = { viewModel.toggleFavorite(item.id) }) {
-                                    Icon(
-                                        imageVector = Icons.Default.Star,
-                                        contentDescription = "Favorite",
-                                        tint = if (item.isFavorite) Color(0xFFFFB300) else Color.Gray,
-                                        modifier = Modifier.graphicsLayer(alpha = if (item.isFavorite) 1f else 0.4f)
-                                    )
-                                }
-                                IconButton(onClick = {
-                                    showRenameDialog = item.id
-                                    renameText = item.name
-                                }) {
-                                    Icon(
-                                        imageVector = Icons.Default.Edit,
-                                        contentDescription = stringResource(R.string.nfc_sim_rename_content_desc),
-                                        tint = Color.Gray
-                                    )
-                                }
-                                IconButton(onClick = { viewModel.deleteHistory(item.id) }) {
-                                    Icon(
-                                        imageVector = Icons.Default.Delete,
-                                        contentDescription = stringResource(R.string.nfc_sim_delete_content_desc),
-                                        tint = Color.Red
-                                    )
+                                    BadgedControl(show = showHelp, number = 6) {
+                                        IconButton(onClick = { viewModel.toggleFavorite(item.id) }) {
+                                            Icon(
+                                                imageVector = Icons.Default.Star,
+                                                contentDescription = "Favorite",
+                                                tint = if (item.isFavorite) Color(0xFFFFB300) else Color.Gray,
+                                                modifier = Modifier.graphicsLayer(alpha = if (item.isFavorite) 1f else 0.4f)
+                                            )
+                                        }
+                                    }
+                                    BadgedControl(show = showHelp, number = 7) {
+                                        IconButton(onClick = {
+                                            showRenameDialog = item.id
+                                            renameText = item.name
+                                        }) {
+                                            Icon(
+                                                imageVector = Icons.Default.Edit,
+                                                contentDescription = stringResource(R.string.nfc_sim_rename_content_desc),
+                                                tint = Color.Gray
+                                            )
+                                        }
+                                    }
+                                    BadgedControl(show = showHelp, number = 8) {
+                                        IconButton(onClick = { viewModel.deleteHistory(item.id) }) {
+                                            Icon(
+                                                imageVector = Icons.Default.Delete,
+                                                contentDescription = stringResource(R.string.nfc_sim_delete_content_desc),
+                                                tint = Color.Red
+                                            )
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -438,6 +462,21 @@ fun NfcSimulationScreen(
                     }
                 }
             }
+        }
+        HelpOverlayScrim(
+            showHelp = showHelp,
+            entries = listOf(
+                1 to R.string.help_nfc_sim_menu,
+                2 to R.string.help_nfc_sim_clear,
+                3 to R.string.help_nfc_sim_send,
+                4 to R.string.help_nfc_sim_clear_history,
+                5 to R.string.help_nfc_sim_history_select,
+                6 to R.string.help_nfc_sim_history_favorite,
+                7 to R.string.help_nfc_sim_history_rename,
+                8 to R.string.help_nfc_sim_history_delete
+            ),
+            onDismiss = { showHelp = false }
+        )
         }
     }
 }

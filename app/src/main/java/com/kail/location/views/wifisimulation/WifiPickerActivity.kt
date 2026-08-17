@@ -6,7 +6,7 @@ import androidx.activity.viewModels
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardOptions
@@ -29,6 +29,9 @@ import com.kail.location.R
 import com.kail.location.models.WifiInfo
 import com.kail.location.viewmodels.WifiSimulationViewModel
 import com.kail.location.views.base.BaseActivity
+import com.kail.location.views.common.BadgedControl
+import com.kail.location.views.common.HelpActionButton
+import com.kail.location.views.common.HelpOverlayScrim
 import com.kail.location.views.theme.locationTheme
 
 class WifiPickerActivity : BaseActivity() {
@@ -56,31 +59,41 @@ fun WifiPickerScreen(
     val nearbyResults by viewModel.nearbyResults.collectAsState()
     val isScanning by viewModel.isScanning.collectAsState()
     var showManualDialog by remember { mutableStateOf(false) }
+    var showHelp by remember { mutableStateOf(false) }
 
+    Box {
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { Text(stringResource(R.string.wifi_sim_picker_title)) },
                 navigationIcon = {
-                    IconButton(onClick = onBackClick) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                    BadgedControl(show = showHelp, number = 1) {
+                        IconButton(onClick = onBackClick) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                        }
                     }
+                },
+                actions = {
+                    HelpActionButton(showHelp = showHelp) { showHelp = true }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.primary,
                     titleContentColor = Color.White,
-                    navigationIconContentColor = Color.White
+                    navigationIconContentColor = Color.White,
+                    actionIconContentColor = Color.White
                 )
             )
         },
         floatingActionButton = {
-            FloatingActionButton(
-                onClick = { showManualDialog = true },
-                containerColor = MaterialTheme.colorScheme.primary,
-                contentColor = Color.White,
-                shape = CircleShape
-            ) {
-                Icon(Icons.Default.Add, contentDescription = stringResource(R.string.wifi_sim_manual_add))
+            BadgedControl(show = showHelp, number = 2) {
+                FloatingActionButton(
+                    onClick = { showManualDialog = true },
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = Color.White,
+                    shape = CircleShape
+                ) {
+                    Icon(Icons.Default.Add, contentDescription = stringResource(R.string.wifi_sim_manual_add))
+                }
             }
         }
     ) { paddingValues ->
@@ -95,30 +108,32 @@ fun WifiPickerScreen(
                     .fillMaxWidth()
                     .padding(16.dp)
             ) {
-                Button(
-                    onClick = { viewModel.scanNearbyWifi() },
-                    enabled = !isScanning,
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
-                ) {
-                    if (isScanning) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(20.dp),
-                            color = Color.White,
-                            strokeWidth = 2.dp
+                BadgedControl(show = showHelp, number = 3, modifier = Modifier.fillMaxWidth()) {
+                    Button(
+                        onClick = { viewModel.scanNearbyWifi() },
+                        enabled = !isScanning,
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                    ) {
+                        if (isScanning) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(20.dp),
+                                color = Color.White,
+                                strokeWidth = 2.dp
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                        } else {
+                            Icon(
+                                imageVector = Icons.Default.Search,
+                                contentDescription = null,
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                        }
+                        Text(
+                            text = if (isScanning) stringResource(R.string.wifi_sim_scanning) else stringResource(R.string.wifi_sim_scan_nearby)
                         )
-                        Spacer(modifier = Modifier.width(8.dp))
-                    } else {
-                        Icon(
-                            imageVector = Icons.Default.Search,
-                            contentDescription = null,
-                            modifier = Modifier.size(20.dp)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
                     }
-                    Text(
-                        text = if (isScanning) stringResource(R.string.wifi_sim_scanning) else stringResource(R.string.wifi_sim_scan_nearby)
-                    )
                 }
             }
 
@@ -155,7 +170,7 @@ fun WifiPickerScreen(
                     contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    items(nearbyResults) { result ->
+                    itemsIndexed(nearbyResults) { index, result ->
                         NearbyWifiItem(
                             ssid = result.SSID.ifBlank { "Hidden Network" },
                             bssid = result.BSSID,
@@ -165,13 +180,26 @@ fun WifiPickerScreen(
                             onAdd = {
                                 viewModel.addFromScanResult(result)
                                 onBackClick()
-                            }
+                            },
+                            showHelp = showHelp && index == 0,
+                            badgeNumber = 4
                         )
                     }
                 }
             }
         }
     }
+        HelpOverlayScrim(
+            showHelp = showHelp,
+            entries = listOf(
+                1 to R.string.help_wifi_picker_back,
+                2 to R.string.help_wifi_picker_manual_add,
+                3 to R.string.help_wifi_picker_scan,
+                4 to R.string.help_wifi_picker_item_add
+            ),
+            onDismiss = { showHelp = false }
+        )
+        }
 
     if (showManualDialog) {
         ManualWifiDialog(
@@ -192,7 +220,9 @@ fun NearbyWifiItem(
     rssi: Int,
     frequency: Int,
     capabilities: String,
-    onAdd: () -> Unit
+    onAdd: () -> Unit,
+    showHelp: Boolean = false,
+    badgeNumber: Int = 0
 ) {
     Card(
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
@@ -238,13 +268,15 @@ fun NearbyWifiItem(
                 }
             }
 
-                            Button(
-                                onClick = onAdd,
-                                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
-                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp)
-                            ) {
-                                Text(stringResource(R.string.wifi_sim_add_label), fontSize = 12.sp)
-                            }
+            BadgedControl(show = showHelp, number = badgeNumber) {
+                Button(
+                    onClick = onAdd,
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp)
+                ) {
+                    Text(stringResource(R.string.wifi_sim_add_label), fontSize = 12.sp)
+                }
+            }
         }
     }
 }

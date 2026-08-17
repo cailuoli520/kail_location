@@ -6,6 +6,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
@@ -16,11 +17,18 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.ui.zIndex
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import com.baidu.mapapi.map.MapView
 import com.kail.location.R
 import com.kail.location.viewmodels.LocationPickerViewModel.PoiInfo
@@ -35,6 +43,8 @@ import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import android.widget.ImageView
 import com.kail.location.views.common.AppDrawer
+import com.kail.location.views.common.BadgedControl
+import com.kail.location.views.common.HelpLegend
 import com.baidu.mapapi.map.BaiduMap
 
 import androidx.compose.material.icons.filled.Check
@@ -71,6 +81,8 @@ fun LocationPickerScreen(
 ) {
     val drawerState = rememberDrawerState(DrawerValue.Closed)
     val scope = rememberCoroutineScope()
+    var showHelp by remember { mutableStateOf(false) }
+    var screenSize by remember { mutableStateOf(IntSize.Zero) }
     
     // Map Type Dialog State
     var showMapTypeDialog by remember { mutableStateOf(false) }
@@ -108,7 +120,8 @@ fun LocationPickerScreen(
             )
         }
     ) {
-        Scaffold(
+        Box(modifier = Modifier.onSizeChanged { screenSize = it }) {
+            Scaffold(
             topBar = {
                 if (isSearchActive) {
                     SearchBar(
@@ -165,19 +178,35 @@ fun LocationPickerScreen(
                     TopAppBar(
                         title = { Text(stringResource(R.string.app_name)) },
                         navigationIcon = {
-                            if (isPickMode) {
-                                IconButton(onClick = onNavigateUp) {
-                                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-                                }
-                            } else {
-                                IconButton(onClick = { scope.launch { drawerState.animateTo(DrawerValue.Open, androidx.compose.animation.core.tween(durationMillis = 160)) } }) {
-                                    Icon(Icons.Default.Menu, contentDescription = "Menu", tint = Color.White)
+                            BadgedControl(show = showHelp, number = 1) {
+                                if (isPickMode) {
+                                    IconButton(onClick = onNavigateUp) {
+                                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                                    }
+                                } else {
+                                    IconButton(onClick = { scope.launch { drawerState.animateTo(DrawerValue.Open, androidx.compose.animation.core.tween(durationMillis = 160)) } }) {
+                                        Icon(Icons.Default.Menu, contentDescription = "Menu", tint = Color.White)
+                                    }
                                 }
                             }
                         },
                         actions = {
-                            IconButton(onClick = { isSearchActive = true }) {
-                                Icon(Icons.Default.Search, contentDescription = "Search")
+                            val helpDesc = stringResource(R.string.loc_sim_help)
+                            IconButton(
+                                onClick = { showHelp = true },
+                                modifier = Modifier.semantics { contentDescription = helpDesc }
+                            ) {
+                                Text(
+                                    text = "?",
+                                    color = Color.White,
+                                    fontSize = 18.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                            BadgedControl(show = showHelp, number = 2) {
+                                IconButton(onClick = { isSearchActive = true }) {
+                                    Icon(Icons.Default.Search, contentDescription = "Search")
+                                }
                             }
                         },
                         colors = TopAppBarDefaults.topAppBarColors(
@@ -191,30 +220,32 @@ fun LocationPickerScreen(
             },
             floatingActionButton = {
                 Column(horizontalAlignment = Alignment.End) {
-                    FloatingActionButton(
-                        onClick = {
-                            if (isStarting) return@FloatingActionButton
-                            if (isPickMode) {
-                                onConfirmSelection()
+                    BadgedControl(show = showHelp, number = 3) {
+                        FloatingActionButton(
+                            onClick = {
+                                if (isStarting) return@FloatingActionButton
+                                if (isPickMode) {
+                                    onConfirmSelection()
+                                } else {
+                                    onToggleMock()
+                                }
+                            },
+                            containerColor = MaterialTheme.colorScheme.secondary
+                        ) {
+                            if (isStarting) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(24.dp),
+                                    strokeWidth = 2.dp,
+                                    color = Color.White
+                                )
+                            } else if (isPickMode) {
+                                Icon(Icons.Default.Check, contentDescription = "Confirm", tint = Color.White)
                             } else {
-                                onToggleMock()
-                            }
-                        },
-                        containerColor = MaterialTheme.colorScheme.secondary
-                    ) {
-                        if (isStarting) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(24.dp),
-                                strokeWidth = 2.dp,
-                                color = Color.White
-                            )
-                        } else if (isPickMode) {
-                            Icon(Icons.Default.Check, contentDescription = "Confirm", tint = Color.White)
-                        } else {
-                            if (isMocking) {
-                                Icon(painterResource(R.drawable.ic_stop_black_24dp), contentDescription = "Stop", tint = Color.White)
-                            } else {
-                                Icon(painterResource(R.drawable.ic_play_arrow_black_24dp), contentDescription = "Start", tint = Color.White)
+                                if (isMocking) {
+                                    Icon(painterResource(R.drawable.ic_stop_black_24dp), contentDescription = "Stop", tint = Color.White)
+                                } else {
+                                    Icon(painterResource(R.drawable.ic_play_arrow_black_24dp), contentDescription = "Start", tint = Color.White)
+                                }
                             }
                         }
                     }
@@ -233,27 +264,65 @@ fun LocationPickerScreen(
                         .padding(end = 16.dp),
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
-                    MapControlButton(
-                        iconRes = R.drawable.ic_map,
-                        onClick = { showMapTypeDialog = true }
-                    )
-                    MapControlButton(
-                        iconRes = R.drawable.ic_input,
-                        onClick = { showLocationInputDialog = true }
-                    )
-                    MapControlButton(
-                        iconRes = R.drawable.ic_home_position,
-                        onClick = onLocate
-                    )
-                    MapControlButton(
-                        iconRes = R.drawable.ic_zoom_in,
-                        onClick = onZoomIn
-                    )
-                    MapControlButton(
-                        iconRes = R.drawable.ic_zoom_out,
-                        onClick = onZoomOut
-                    )
+                    BadgedControl(show = showHelp, number = 4) {
+                        MapControlButton(
+                            iconRes = R.drawable.ic_map,
+                            onClick = { showMapTypeDialog = true }
+                        )
+                    }
+                    BadgedControl(show = showHelp, number = 5) {
+                        MapControlButton(
+                            iconRes = R.drawable.ic_input,
+                            onClick = { showLocationInputDialog = true }
+                        )
+                    }
+                    BadgedControl(show = showHelp, number = 6) {
+                        MapControlButton(
+                            iconRes = R.drawable.ic_home_position,
+                            onClick = onLocate
+                        )
+                    }
+                    BadgedControl(show = showHelp, number = 7) {
+                        MapControlButton(
+                            iconRes = R.drawable.ic_zoom_in,
+                            onClick = onZoomIn
+                        )
+                    }
+                    BadgedControl(show = showHelp, number = 8) {
+                        MapControlButton(
+                            iconRes = R.drawable.ic_zoom_out,
+                            onClick = onZoomOut
+                        )
+                    }
                 }
+            }
+        }
+
+            if (showHelp) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(Color(0x66000000))
+                        .pointerInput(Unit) { detectTapGestures { showHelp = false } }
+                        .zIndex(10f)
+                )
+                HelpLegend(
+                    entries = listOf(
+                        1 to (if (isPickMode) R.string.help_picker_back else R.string.help_picker_menu),
+                        2 to R.string.help_picker_search,
+                        3 to (if (isPickMode) R.string.help_picker_fab_confirm else R.string.help_picker_fab),
+                        4 to R.string.help_picker_map_type,
+                        5 to R.string.help_picker_input,
+                        6 to R.string.help_picker_locate,
+                        7 to R.string.help_picker_zoom_in,
+                        8 to R.string.help_picker_zoom_out
+                    ),
+                    onDismiss = { showHelp = false },
+                    screenSize = screenSize,
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .zIndex(20f)
+                )
             }
         }
     }

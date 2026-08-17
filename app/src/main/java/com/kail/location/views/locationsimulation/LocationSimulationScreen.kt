@@ -4,8 +4,9 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.ui.input.pointer.pointerInput
@@ -35,6 +36,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import android.widget.ImageView
 import com.kail.location.R
 import com.kail.location.viewmodels.LocationSimulationViewModel
@@ -42,6 +47,8 @@ import kotlinx.coroutines.launch
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.window.Dialog
+import com.kail.location.views.common.BadgedControl
+import com.kail.location.views.common.HelpLegend
 import com.kail.location.views.common.DrawerHeader
 import androidx.compose.ui.platform.LocalContext
 import androidx.preference.PreferenceManager
@@ -108,6 +115,8 @@ fun LocationSimulationScreen(
     var renameText by remember { mutableStateOf("") }
     var showSettingsDialog by remember { mutableStateOf(false) }
     var isCardExpanded by remember { mutableStateOf(true) }
+    var showHelp by remember { mutableStateOf(false) }
+    var screenSize by remember { mutableStateOf(IntSize.Zero) }
 
     val drawerState = rememberDrawerState(DrawerValue.Closed)
     val scope = rememberCoroutineScope()
@@ -122,8 +131,6 @@ fun LocationSimulationScreen(
         // But since this is a Composable function, it might not be the best place for lifecycle events.
         // Let's assume the ViewModel handles data loading, or the Activity calls it.
     }
-
-
 
     ModalNavigationDrawer(
         drawerState = drawerState,
@@ -142,16 +149,35 @@ fun LocationSimulationScreen(
             )
         }
     ) {
+        Box(modifier = Modifier.onSizeChanged { screenSize = it }) {
         Scaffold(
             topBar = {
                 TopAppBar(
                     title = { Text(stringResource(R.string.loc_sim_title)) },
                     navigationIcon = {
-                        IconButton(onClick = { scope.launch { drawerState.animateTo(DrawerValue.Open, androidx.compose.animation.core.tween(durationMillis = 160)) } }) {
-                            Icon(
-                                Icons.Default.Menu,
-                                contentDescription = "Menu",
-                                tint = Color.White
+                        BadgedControl(show = showHelp, number = 1) {
+                            IconButton(
+                                onClick = { scope.launch { drawerState.animateTo(DrawerValue.Open, androidx.compose.animation.core.tween(durationMillis = 160)) } }
+                            ) {
+                                Icon(
+                                    Icons.Default.Menu,
+                                    contentDescription = "Menu",
+                                    tint = Color.White
+                                )
+                            }
+                        }
+                    },
+                    actions = {
+                        val helpDesc = stringResource(R.string.loc_sim_help)
+                        IconButton(
+                            onClick = { showHelp = true }
+                        ) {
+                            Text(
+                                text = "?",
+                                color = Color.White,
+                                fontSize = 18.sp,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.semantics { contentDescription = helpDesc }
                             )
                         }
                     },
@@ -183,27 +209,29 @@ fun LocationSimulationScreen(
                     ) {
                         Column(modifier = Modifier.padding(16.dp)) {
                             // Collapsible header row (always visible, tap to expand)
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clickable { isCardExpanded = !isCardExpanded },
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(
-                                        text = locationInfo.name,
-                                        style = MaterialTheme.typography.titleMedium,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                    Text(
-                                        text = stringResource(
-                                            R.string.loc_sim_lat_lng,
-                                            String.format("%.2f", locationInfo.longitude),
-                                            String.format("%.2f", locationInfo.latitude)
-                                        ),
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.primary
-                                    )
+                            BadgedControl(show = showHelp, number = 3, modifier = Modifier.fillMaxWidth()) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clickable { isCardExpanded = !isCardExpanded },
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = locationInfo.name,
+                                            style = MaterialTheme.typography.titleMedium,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                        Text(
+                                            text = stringResource(
+                                                R.string.loc_sim_lat_lng,
+                                                String.format("%.2f", locationInfo.longitude),
+                                                String.format("%.2f", locationInfo.latitude)
+                                            ),
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.primary
+                                        )
+                                    }
                                 }
                             }
 
@@ -238,47 +266,51 @@ fun LocationSimulationScreen(
                                 )
                                 Spacer(modifier = Modifier.height(16.dp))
 
-                                Row(
+Row(
                                     verticalAlignment = Alignment.CenterVertically,
                                     modifier = Modifier.fillMaxWidth()
                                 ) {
-                                    Button(
-                                        onClick = onToggleSimulation,
-                                        enabled = !isStarting,
-                                        colors = ButtonDefaults.buttonColors(
-                                            containerColor = if (isSimulating) Color.Red else MaterialTheme.colorScheme.primary,
-                                            disabledContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.72f),
-                                            disabledContentColor = Color.White
-                                        ),
-                                        shape = RoundedCornerShape(24.dp)
-                                    ) {
-                                        if (isStarting) {
-                                            CircularProgressIndicator(
-                                                modifier = Modifier.size(18.dp),
-                                                strokeWidth = 2.dp,
-                                                color = Color.White
-                                            )
-                                            Spacer(modifier = Modifier.width(8.dp))
-                                            Text(stringResource(R.string.sim_starting))
-                                        } else {
-                                            Text(
-                                                if (isSimulating) stringResource(R.string.loc_sim_stop) else stringResource(
-                                                    R.string.loc_sim_start
+                                    BadgedControl(show = showHelp, number = 4) {
+                                        Button(
+                                            onClick = onToggleSimulation,
+                                            enabled = !isStarting,
+                                            colors = ButtonDefaults.buttonColors(
+                                                containerColor = if (isSimulating) Color.Red else MaterialTheme.colorScheme.primary,
+                                                disabledContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.72f),
+                                                disabledContentColor = Color.White
+                                            ),
+                                            shape = RoundedCornerShape(24.dp)
+                                        ) {
+                                            if (isStarting) {
+                                                CircularProgressIndicator(
+                                                    modifier = Modifier.size(18.dp),
+                                                    strokeWidth = 2.dp,
+                                                    color = Color.White
                                                 )
-                                            )
+                                                Spacer(modifier = Modifier.width(8.dp))
+                                                Text(stringResource(R.string.sim_starting))
+                                            } else {
+                                                Text(
+                                                    if (isSimulating) stringResource(R.string.loc_sim_stop) else stringResource(
+                                                        R.string.loc_sim_start
+                                                    )
+                                                )
+                                            }
                                         }
                                     }
                                     Spacer(modifier = Modifier.weight(0.5f))
 
-                                    IconButton(
-                                        onClick = { isCardExpanded = !isCardExpanded },
-                                        modifier = Modifier.size(32.dp)
-                                    ) {
-                                        Icon(
-                                            if (isCardExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
-                                            contentDescription = if (isCardExpanded) "Collapse" else "Expand",
-                                            tint = MaterialTheme.colorScheme.primary
-                                        )
+                                    BadgedControl(show = showHelp, number = 5) {
+                                        IconButton(
+                                            onClick = { isCardExpanded = !isCardExpanded },
+                                            modifier = Modifier.size(32.dp)
+                                        ) {
+                                            Icon(
+                                                if (isCardExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                                                contentDescription = if (isCardExpanded) "Collapse" else "Expand",
+                                                tint = MaterialTheme.colorScheme.primary
+                                            )
+                                        }
                                     }
 
                                     Spacer(modifier = Modifier.weight(0.5f))
@@ -291,35 +323,40 @@ fun LocationSimulationScreen(
                                         fontWeight = FontWeight.Bold
                                     )
                                     Spacer(modifier = Modifier.width(4.dp))
-                                    Switch(
-                                        checked = isJoystickEnabled,
-                                        onCheckedChange = onJoystickToggle,
-                                        modifier = Modifier.scale(0.8f)
-                                    )
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    IconButton(onClick = { showSettingsDialog = true }) {
-                                        Icon(
-                                            Icons.Default.Settings,
-                                            contentDescription = "Settings",
-                                            tint = MaterialTheme.colorScheme.primary
+                                    BadgedControl(show = showHelp, number = 6) {
+                                        Switch(
+                                            checked = isJoystickEnabled,
+                                            onCheckedChange = onJoystickToggle,
+                                            modifier = Modifier.scale(0.8f)
                                         )
                                     }
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    BadgedControl(show = showHelp, number = 7) {
+                                        IconButton(onClick = { showSettingsDialog = true }) {
+                                            Icon(
+                                                Icons.Default.Settings,
+                                                contentDescription = "Settings",
+                                                tint = MaterialTheme.colorScheme.primary
+                                            )
+                                        }
+                                    }
                                 }
-                            }
-                        }
-                    }
+        }
+    }
+}
 
                     // Plus Button
-                    FloatingActionButton(
-                        onClick = onAddLocation,
-                        containerColor = MaterialTheme.colorScheme.secondary, // Greenish color
-                        shape = CircleShape,
-                        modifier = Modifier
-                            .align(Alignment.TopEnd)
-                            .offset(y = 0.dp) // Adjust position to overlap
-                            .size(48.dp)
-                    ) {
-                        Icon(Icons.Default.Add, contentDescription = "Add", tint = Color.White)
+                    BadgedControl(show = showHelp, number = 2, modifier = Modifier.align(Alignment.TopEnd)) {
+                        FloatingActionButton(
+                            onClick = onAddLocation,
+                            containerColor = MaterialTheme.colorScheme.secondary, // Greenish color
+                            shape = CircleShape,
+                            modifier = Modifier
+                                .offset(y = 0.dp)
+                                .size(48.dp)
+                        ) {
+                            Icon(Icons.Default.Add, contentDescription = "Add", tint = Color.White)
+                        }
                     }
                 }
 
@@ -333,12 +370,16 @@ fun LocationSimulationScreen(
                     else favRecords.filter { it.name.contains(searchQuery, ignoreCase = true) || it.displayTime.contains(searchQuery, ignoreCase = true) }
 
                 Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
-                    TabRow(selectedTabIndex = selectedTab, modifier = Modifier.weight(1f)) {
-                        Tab(selected = selectedTab == 0, onClick = { selectedTab = 0 }, text = { Text(stringResource(R.string.joystick_history_favorites), fontSize = 14.sp) })
-                        Tab(selected = selectedTab == 1, onClick = { selectedTab = 1 }, text = { Text(stringResource(R.string.joystick_history_normal), fontSize = 14.sp) })
+                    BadgedControl(show = showHelp, number = 8, modifier = Modifier.weight(1f)) {
+                        TabRow(selectedTabIndex = selectedTab, modifier = Modifier.fillMaxWidth()) {
+                            Tab(selected = selectedTab == 0, onClick = { selectedTab = 0 }, text = { Text(stringResource(R.string.joystick_history_favorites), fontSize = 14.sp) })
+                            Tab(selected = selectedTab == 1, onClick = { selectedTab = 1 }, text = { Text(stringResource(R.string.joystick_history_normal), fontSize = 14.sp) })
+                        }
                     }
-                    IconButton(onClick = { isSearchVisible = !isSearchVisible }) {
-                        Icon(Icons.Default.Search, contentDescription = "Search")
+                    BadgedControl(show = showHelp, number = 9) {
+                        IconButton(onClick = { isSearchVisible = !isSearchVisible }) {
+                            Icon(Icons.Default.Search, contentDescription = "Search")
+                        }
                     }
                 }
 
@@ -445,7 +486,7 @@ fun LocationSimulationScreen(
                                 }
                                 .padding(horizontal = 16.dp, vertical = 8.dp)
                         ) {
-                            localFavList.forEachIndexed { _, record ->
+                            localFavList.forEachIndexed { index, record ->
                                 val isDragged = draggedId == record.id
                                 Box(
                                     modifier = Modifier
@@ -463,7 +504,9 @@ fun LocationSimulationScreen(
                                         onToggleFavorite = { onToggleFavorite(record.id) },
                                         onRename = { renameTarget = record; renameText = record.name },
                                         onRecordSelect = onRecordSelect,
-                                        onRecordDelete = { onRecordDelete(record.id) }
+                                        onRecordDelete = { onRecordDelete(record.id) },
+                                        showHelp = showHelp && index == 0,
+                                        badgeBase = 10
                                     )
                                 }
                                 Spacer(modifier = Modifier.height(8.dp))
@@ -474,8 +517,18 @@ fun LocationSimulationScreen(
                     val src = if (searchQuery.isBlank()) historyRecords
                         else historyRecords.filter { it.name.contains(searchQuery, ignoreCase = true) || it.displayTime.contains(searchQuery, ignoreCase = true) }
                     LazyColumn(modifier = Modifier.weight(1f), contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        items(src.sortedByDescending { it.timestamp }, key = { "all_${it.id}" }) { record ->
-                            historyRecordCard(record = record, isFav = record.isFavorite, showMoveButtons = false, onToggleFavorite = onToggleFavorite, onRename = { renameTarget = it; renameText = it.name }, onRecordSelect = onRecordSelect, onRecordDelete = onRecordDelete)
+                        itemsIndexed(src.sortedByDescending { it.timestamp }, key = { _, item -> "all_${item.id}" }) { index, record ->
+                            historyRecordCard(
+                                record = record,
+                                isFav = record.isFavorite,
+                                showMoveButtons = false,
+                                onToggleFavorite = onToggleFavorite,
+                                onRename = { renameTarget = it; renameText = it.name },
+                                onRecordSelect = onRecordSelect,
+                                onRecordDelete = onRecordDelete,
+                                showHelp = showHelp && index == 0,
+                                badgeBase = 10
+                            )
                         }
                     }
                 }
@@ -492,6 +545,39 @@ fun LocationSimulationScreen(
                 )
             }
         }
+
+        if (showHelp) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color(0x66000000))
+                    .pointerInput(Unit) { detectTapGestures { showHelp = false } }
+                    .zIndex(10f)
+            )
+
+            HelpLegend(
+                entries = listOf(
+                    1 to R.string.help_menu,
+                    2 to R.string.help_add_location,
+                    3 to R.string.help_header,
+                    4 to R.string.help_start,
+                    5 to R.string.help_collapse,
+                    6 to R.string.help_joystick,
+                    7 to R.string.help_settings,
+                    8 to R.string.help_tabs,
+                    9 to R.string.help_search,
+                    10 to R.string.help_card_fav,
+                    11 to R.string.help_card_rename,
+                    12 to R.string.help_card_delete
+                ),
+                onDismiss = { showHelp = false },
+                screenSize = screenSize,
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .zIndex(20f)
+            )
+        }
+    }
     }
 
     if (renameTarget != null) {
@@ -532,13 +618,16 @@ fun historyRecordCard(
     onRecordSelect: (com.kail.location.models.HistoryRecord) -> Unit,
     onRecordDelete: (Int) -> Unit,
     onMoveUp: () -> Unit = {},
-    onMoveDown: () -> Unit = {}
+    onMoveDown: () -> Unit = {},
+    modifier: Modifier = Modifier,
+    showHelp: Boolean = false,
+    badgeBase: Int = 0
 ) {
     Card(
         colors = CardDefaults.cardColors(),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
         shape = RoundedCornerShape(8.dp),
-        modifier = Modifier.fillMaxWidth().clickable { onRecordSelect(record) }
+        modifier = modifier.fillMaxWidth().clickable { onRecordSelect(record) }
     ) {
         Row(
             modifier = Modifier.padding(16.dp),
@@ -556,30 +645,38 @@ fun historyRecordCard(
                 Text(text = record.displayTime, fontSize = 12.sp, color = Color.Gray)
             }
             Row {
-                IconButton(onClick = { onToggleFavorite(record.id) }) {
-                    Icon(
-                        Icons.Default.Star,
-                        contentDescription = "Favorite",
-                        tint = if (isFav) Color(0xFFFFB300) else Color.Gray,
-                        modifier = Modifier.graphicsLayer(alpha = if (isFav) 1f else 0.4f)
-                    )
+                BadgedControl(show = showHelp, number = badgeBase) {
+                    IconButton(onClick = { onToggleFavorite(record.id) }) {
+                        Icon(
+                            Icons.Default.Star,
+                            contentDescription = "Favorite",
+                            tint = if (isFav) Color(0xFFFFB300) else Color.Gray,
+                            modifier = Modifier.graphicsLayer(alpha = if (isFav) 1f else 0.4f)
+                        )
+                    }
                 }
-                IconButton(onClick = { onRename(record) }) {
-                    Icon(Icons.Default.Edit, contentDescription = "Rename", tint = MaterialTheme.colorScheme.primary)
+                BadgedControl(show = showHelp, number = badgeBase + 1) {
+                    IconButton(onClick = { onRename(record) }) {
+                        Icon(Icons.Default.Edit, contentDescription = "Rename", tint = MaterialTheme.colorScheme.primary)
+                    }
                 }
                 val context = LocalContext.current
                 val prefs = remember { PreferenceManager.getDefaultSharedPreferences(context) }
                 val showDeleteConfirm = remember { mutableStateOf(false) }
                 var dontRemind by remember { mutableStateOf(false) }
-                IconButton(onClick = {
-                    if (System.currentTimeMillis() < prefs.getLong("delete_dont_remind_until", 0L)) {
-                        onRecordDelete(record.id)
-                    } else {
-                        showDeleteConfirm.value = true
-                        dontRemind = false
+                BadgedControl(show = showHelp, number = badgeBase + 2) {
+                    IconButton(
+                        onClick = {
+                            if (System.currentTimeMillis() < prefs.getLong("delete_dont_remind_until", 0L)) {
+                                onRecordDelete(record.id)
+                            } else {
+                                showDeleteConfirm.value = true
+                                dontRemind = false
+                            }
+                        }
+                    ) {
+                        Icon(Icons.Default.Delete, contentDescription = "Delete", tint = Color.Red)
                     }
-                }) {
-                    Icon(Icons.Default.Delete, contentDescription = "Delete", tint = Color.Red)
                 }
                 if (showDeleteConfirm.value) {
                     AlertDialog(

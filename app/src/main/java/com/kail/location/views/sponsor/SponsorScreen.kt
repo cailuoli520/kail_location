@@ -20,6 +20,9 @@ import androidx.compose.ui.unit.sp
 import com.kail.location.R
 import com.kail.location.auth.AuthManager
 import com.kail.location.network.RuoYiClient
+import com.kail.location.views.common.BadgedControl
+import com.kail.location.views.common.HelpActionButton
+import com.kail.location.views.common.HelpOverlayScrim
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -36,24 +39,31 @@ fun SponsorScreen(
     val context = LocalContext.current
     val isLoggedIn = AuthManager.isLoggedIn
     val isSubscribed = AuthManager.isSubscribed
+    var showHelp by remember { mutableStateOf(false) }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text(stringResource(R.string.sponsor_top_title)) },
-                navigationIcon = {
-                    IconButton(onClick = onBackClick) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.checkout_back_desc))
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    titleContentColor = Color.White,
-                    navigationIconContentColor = Color.White
+    Box {
+        Scaffold(
+            topBar = {
+                TopAppBar(
+                    title = { Text(stringResource(R.string.sponsor_top_title)) },
+                    navigationIcon = {
+                        BadgedControl(show = showHelp, number = 1) {
+                            IconButton(onClick = onBackClick) {
+                                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.checkout_back_desc))
+                            }
+                        }
+                    },
+                    actions = {
+                        HelpActionButton(showHelp = showHelp) { showHelp = true }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        titleContentColor = Color.White,
+                        navigationIconContentColor = Color.White
+                    )
                 )
-            )
-        }
-    ) { paddingValues ->
+            }
+        ) { paddingValues ->
         Column(
             modifier = Modifier
                 .padding(paddingValues)
@@ -97,6 +107,7 @@ fun SponsorScreen(
             } else if (plansLoaded && plans.isNotEmpty()) {
                 plans.forEach { plan ->
                     val isSelected = plan.id == selectedPlanId
+                    BadgedControl(show = showHelp, number = 2, modifier = Modifier.fillMaxWidth()) {
                     Card(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -141,6 +152,7 @@ fun SponsorScreen(
                             )
                         }
                     }
+                    }
                 }
             } else if (!plansLoaded) {
                 CircularProgressIndicator(modifier = Modifier.padding(16.dp))
@@ -160,18 +172,20 @@ fun SponsorScreen(
                     }
                 }
             } else if (!isSubscribed && plansLoaded) {
-                Button(
-                    onClick = onCreateCheckout,
-                    enabled = !isCreatingCheckout && selectedPlanId != null,
-                    modifier = Modifier.fillMaxWidth().height(52.dp),
-                    shape = MaterialTheme.shapes.medium
-                ) {
-                    if (isCreatingCheckout) {
-                        CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp, color = MaterialTheme.colorScheme.onPrimary)
-                    } else {
-                        Icon(Icons.Default.ShoppingCart, contentDescription = null)
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(stringResource(R.string.sponsor_go_pay), fontSize = 16.sp)
+                BadgedControl(show = showHelp, number = 3, modifier = Modifier.fillMaxWidth()) {
+                    Button(
+                        onClick = onCreateCheckout,
+                        enabled = !isCreatingCheckout && selectedPlanId != null,
+                        modifier = Modifier.fillMaxWidth().height(52.dp),
+                        shape = MaterialTheme.shapes.medium
+                    ) {
+                        if (isCreatingCheckout) {
+                            CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp, color = MaterialTheme.colorScheme.onPrimary)
+                        } else {
+                            Icon(Icons.Default.ShoppingCart, contentDescription = null)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(stringResource(R.string.sponsor_go_pay), fontSize = 16.sp)
+                        }
                     }
                 }
             }
@@ -197,13 +211,27 @@ fun SponsorScreen(
                 Text("0x549928ea1ab2407bcba7bdde7b6a62a6e5a68e08f9bbe798ed151cef086da883", style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(12.dp))
             }
             Spacer(modifier = Modifier.height(8.dp))
-            OutlinedButton(
-                onClick = {
-                    val clipboard = context.getSystemService(android.content.ClipboardManager::class.java)
-                    clipboard?.setPrimaryClip(android.content.ClipData.newPlainText("Aptos Address", "0x549928ea1ab2407bcba7bdde7b6a62a6e5a68e08f9bbe798ed151cef086da883"))
-                },
-                modifier = Modifier.fillMaxWidth()
-            ) { Text(stringResource(R.string.sponsor_copy_aptos_address)) }
+            BadgedControl(show = showHelp, number = 4, modifier = Modifier.fillMaxWidth()) {
+                OutlinedButton(
+                    onClick = {
+                        val clipboard = context.getSystemService(android.content.ClipboardManager::class.java)
+                        clipboard?.setPrimaryClip(android.content.ClipData.newPlainText("Aptos Address", "0x549928ea1ab2407bcba7bdde7b6a62a6e5a68e08f9bbe798ed151cef086da883"))
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                ) { Text(stringResource(R.string.sponsor_copy_aptos_address)) }
+            }
         }
+    }
+
+    HelpOverlayScrim(
+        showHelp = showHelp,
+        entries = listOf(
+            1 to R.string.help_sponsor_back,
+            2 to R.string.help_sponsor_select_plan,
+            3 to R.string.help_sponsor_checkout,
+            4 to R.string.help_sponsor_copy_address
+        ),
+        onDismiss = { showHelp = false }
+    )
     }
 }

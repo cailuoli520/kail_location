@@ -47,6 +47,9 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.input.KeyboardType
 import com.kail.location.views.common.AppDrawer
+import com.kail.location.views.common.BadgedControl
+import com.kail.location.views.common.HelpActionButton
+import com.kail.location.views.common.HelpOverlayScrim
 import androidx.compose.ui.platform.LocalContext
 import androidx.preference.PreferenceManager
 import kotlinx.coroutines.launch
@@ -91,6 +94,7 @@ fun NavigationSimulationScreen(
     // Rename State
     var renameTarget by remember { mutableStateOf<RouteInfo?>(null) }
     var renameText by remember { mutableStateOf("") }
+    var showHelp by remember { mutableStateOf(false) }
 
     val context = androidx.compose.ui.platform.LocalContext.current
 
@@ -162,14 +166,20 @@ fun NavigationSimulationScreen(
             )
         }
     ) {
+        Box {
         Scaffold(
             topBar = {
                 TopAppBar(
                     title = { Text(stringResource(R.string.nav_sim_title), color = Color.White) },
                     navigationIcon = {
-                        IconButton(onClick = { scope.launch { drawerState.animateTo(DrawerValue.Open, androidx.compose.animation.core.tween(durationMillis = 160)) } }) {
-                            Icon(Icons.Default.Menu, contentDescription = "Menu", tint = Color.White)
+                        BadgedControl(show = showHelp, number = 1) {
+                            IconButton(onClick = { scope.launch { drawerState.animateTo(DrawerValue.Open, androidx.compose.animation.core.tween(durationMillis = 160)) } }) {
+                                Icon(Icons.Default.Menu, contentDescription = "Menu", tint = Color.White)
+                            }
                         }
+                    },
+                    actions = {
+                        HelpActionButton(showHelp = showHelp) { showHelp = true }
                     },
                     colors = TopAppBarDefaults.topAppBarColors(
                         containerColor = MaterialTheme.colorScheme.primary
@@ -221,8 +231,10 @@ fun NavigationSimulationScreen(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.End
                             ) {
-                                IconButton(onClick = { viewModel.clearPoints() }) {
-                                    Icon(Icons.Default.Delete, contentDescription = "Clear", tint = Color.Red)
+                                BadgedControl(show = showHelp, number = 2) {
+                                    IconButton(onClick = { viewModel.clearPoints() }) {
+                                        Icon(Icons.Default.Delete, contentDescription = "Clear", tint = Color.Red)
+                                    }
                                 }
                             }
 
@@ -276,86 +288,101 @@ fun NavigationSimulationScreen(
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                             if (!isSimulating) {
-                                Button(
-                                    onClick = {
-                                        if (plannedRoute == null) viewModel.planRoute() else viewModel.startSimulation()
-                                    },
-                                    enabled = !isLoading && startPoint.isNotEmpty() && endPoint.isNotEmpty(),
-                                    colors = ButtonDefaults.buttonColors(
-                                        containerColor = MaterialTheme.colorScheme.primary,
-                                        contentColor = MaterialTheme.colorScheme.onPrimary,
-                                        disabledContainerColor = MaterialTheme.colorScheme.primary,
-                                        disabledContentColor = MaterialTheme.colorScheme.onPrimary
-                                    ),
-                                    shape = RoundedCornerShape(24.dp),
+                                BadgedControl(
+                                    show = showHelp,
+                                    number = 3,
                                     modifier = Modifier.weight(1f)
                                 ) {
-                                    if (isLoading) {
-                                        CircularProgressIndicator(
-                                            modifier = Modifier.size(20.dp),
-                                            color = MaterialTheme.colorScheme.onPrimary
-                                        )
-                                        Spacer(modifier = Modifier.width(8.dp))
-                                        Text(stringResource(R.string.nav_sim_planning), color = MaterialTheme.colorScheme.onPrimary)
-                                    } else {
-                                        Text(
-                                            text = if (plannedRoute == null) stringResource(R.string.nav_sim_plan) else stringResource(R.string.nav_sim_start),
-                                            color = MaterialTheme.colorScheme.onPrimary
-                                        )
+                                    Button(
+                                        onClick = {
+                                            if (plannedRoute == null) viewModel.planRoute() else viewModel.startSimulation()
+                                        },
+                                        enabled = !isLoading && startPoint.isNotEmpty() && endPoint.isNotEmpty(),
+                                        colors = ButtonDefaults.buttonColors(
+                                            containerColor = MaterialTheme.colorScheme.primary,
+                                            contentColor = MaterialTheme.colorScheme.onPrimary,
+                                            disabledContainerColor = MaterialTheme.colorScheme.primary,
+                                            disabledContentColor = MaterialTheme.colorScheme.onPrimary
+                                        ),
+                                        shape = RoundedCornerShape(24.dp)
+                                    ) {
+                                        if (isLoading) {
+                                            CircularProgressIndicator(
+                                                modifier = Modifier.size(20.dp),
+                                                color = MaterialTheme.colorScheme.onPrimary
+                                            )
+                                            Spacer(modifier = Modifier.width(8.dp))
+                                            Text(stringResource(R.string.nav_sim_planning), color = MaterialTheme.colorScheme.onPrimary)
+                                        } else {
+                                            Text(
+                                                text = if (plannedRoute == null) stringResource(R.string.nav_sim_plan) else stringResource(R.string.nav_sim_start),
+                                                color = MaterialTheme.colorScheme.onPrimary
+                                            )
+                                        }
                                     }
                                 }
                             } else {
                                 Row(modifier = Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                                    Button(
-                                        onClick = { if (isPaused) viewModel.resumeSimulation() else viewModel.pauseSimulation() },
-                                        colors = ButtonDefaults.buttonColors(
-                                            containerColor = MaterialTheme.colorScheme.primary,
-                                            contentColor = MaterialTheme.colorScheme.onPrimary
-                                        ),
-                                        shape = RoundedCornerShape(24.dp),
-                                        modifier = Modifier.weight(1f)
-                                    ) { Text(if (isPaused) stringResource(R.string.nav_sim_resume) else stringResource(R.string.nav_sim_pause)) }
-                                    Button(
-                                        onClick = { viewModel.stopSimulation() },
-                                        colors = ButtonDefaults.buttonColors(
-                                            containerColor = Color.Red,
-                                            contentColor = MaterialTheme.colorScheme.onPrimary
-                                        ),
-                                        shape = RoundedCornerShape(24.dp),
-                                        modifier = Modifier.weight(1f)
-                                    ) { Text(stringResource(R.string.nav_sim_stop)) }
+                                    BadgedControl(show = showHelp, number = 4, modifier = Modifier.weight(1f)) {
+                                        Button(
+                                            onClick = { if (isPaused) viewModel.resumeSimulation() else viewModel.pauseSimulation() },
+                                            colors = ButtonDefaults.buttonColors(
+                                                containerColor = MaterialTheme.colorScheme.primary,
+                                                contentColor = MaterialTheme.colorScheme.onPrimary
+                                            ),
+                                            shape = RoundedCornerShape(24.dp)
+                                        ) { Text(if (isPaused) stringResource(R.string.nav_sim_resume) else stringResource(R.string.nav_sim_pause)) }
+                                    }
+                                    BadgedControl(show = showHelp, number = 5, modifier = Modifier.weight(1f)) {
+                                        Button(
+                                            onClick = { viewModel.stopSimulation() },
+                                            colors = ButtonDefaults.buttonColors(
+                                                containerColor = Color.Red,
+                                                contentColor = MaterialTheme.colorScheme.onPrimary
+                                            ),
+                                            shape = RoundedCornerShape(24.dp)
+                                        ) { Text(stringResource(R.string.nav_sim_stop)) }
+                                    }
                                 }
                             }
                                 
                                 Spacer(modifier = Modifier.width(16.dp))
                                 
                                 Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Checkbox(
-                                        checked = isMultiRoute,
-                                        onCheckedChange = { viewModel.setMultiRoute(it) }
-                                    )
+                                    BadgedControl(show = showHelp, number = 6) {
+                                        Checkbox(
+                                            checked = isMultiRoute,
+                                            onCheckedChange = { viewModel.setMultiRoute(it) }
+                                        )
+                                    }
                                     Text(stringResource(R.string.nav_sim_multi_route), fontSize = 14.sp)
                                 }
                                 
                                 Spacer(modifier = Modifier.width(8.dp))
                                 
-                                IconButton(onClick = { showSpeedDialog = true }) {
-                                    Icon(Icons.Default.Settings, contentDescription = "Settings", tint = MaterialTheme.colorScheme.primary)
+                                BadgedControl(show = showHelp, number = 7) {
+                                    IconButton(onClick = { showSpeedDialog = true }) {
+                                        Icon(Icons.Default.Settings, contentDescription = "Settings", tint = MaterialTheme.colorScheme.primary)
+                                    }
                                 }
                             }
                         }
                     }
 
-                        FloatingActionButton(
-                            onClick = onPlanRouteClick,
-                            containerColor = MaterialTheme.colorScheme.primary,
-                            contentColor = Color.White,
-                            shape = CircleShape,
-                            modifier = Modifier
-                                .align(Alignment.TopEnd)
-                                .size(48.dp)
+                        BadgedControl(
+                            show = showHelp,
+                            number = 8,
+                            modifier = Modifier.align(Alignment.TopEnd)
                         ) {
-                            Icon(Icons.Default.Add, contentDescription = "Plan", tint = Color.White)
+                            FloatingActionButton(
+                                onClick = onPlanRouteClick,
+                                containerColor = MaterialTheme.colorScheme.primary,
+                                contentColor = Color.White,
+                                shape = CircleShape,
+                                modifier = Modifier.size(48.dp)
+                            ) {
+                                Icon(Icons.Default.Add, contentDescription = "Plan", tint = Color.White)
+                            }
                         }
                     }
 
@@ -373,19 +400,25 @@ fun NavigationSimulationScreen(
                             selectedTabIndex = selectedTab,
                             modifier = Modifier.weight(1f)
                         ) {
-                            Tab(
-                                selected = selectedTab == 0,
-                                onClick = { selectedTab = 0 },
-                                text = { Text(stringResource(R.string.joystick_history_favorites), fontSize = 14.sp) }
-                            )
-                            Tab(
-                                selected = selectedTab == 1,
-                                onClick = { selectedTab = 1 },
-                                text = { Text(stringResource(R.string.joystick_history_normal), fontSize = 14.sp) }
-                            )
+                            BadgedControl(show = showHelp, number = 9) {
+                                Tab(
+                                    selected = selectedTab == 0,
+                                    onClick = { selectedTab = 0 },
+                                    text = { Text(stringResource(R.string.joystick_history_favorites), fontSize = 14.sp) }
+                                )
+                            }
+                            BadgedControl(show = showHelp, number = 10) {
+                                Tab(
+                                    selected = selectedTab == 1,
+                                    onClick = { selectedTab = 1 },
+                                    text = { Text(stringResource(R.string.joystick_history_normal), fontSize = 14.sp) }
+                                )
+                            }
                         }
-                        IconButton(onClick = { isSearchVisible = !isSearchVisible }) {
-                            Icon(Icons.Default.Search, contentDescription = "Search")
+                        BadgedControl(show = showHelp, number = 11) {
+                            IconButton(onClick = { isSearchVisible = !isSearchVisible }) {
+                                Icon(Icons.Default.Search, contentDescription = "Search")
+                            }
                         }
                     }
 
@@ -413,8 +446,10 @@ fun NavigationSimulationScreen(
                                         innerTextField()
                                     }
                                     if (searchQuery.isNotEmpty()) {
-                                        IconButton(onClick = { searchQuery = ""; isSearchVisible = false }, modifier = Modifier.size(18.dp)) {
-                                            Icon(Icons.Default.Close, contentDescription = "Clear", modifier = Modifier.size(14.dp))
+                                        BadgedControl(show = showHelp, number = 12) {
+                                            IconButton(onClick = { searchQuery = ""; isSearchVisible = false }, modifier = Modifier.size(18.dp)) {
+                                                Icon(Icons.Default.Close, contentDescription = "Clear", modifier = Modifier.size(14.dp))
+                                            }
                                         }
                                     }
                                 }
@@ -513,6 +548,7 @@ fun NavigationSimulationScreen(
                                             route = route,
                                             isFav = true,
                                             showMoveButtons = false,
+                                            showHelp = showHelp,
                                             onSelect = { viewModel.selectHistoryRoute(route) },
                                             onToggleFavorite = {
                                                 route.id.toLongOrNull()?.let { viewModel.toggleFavorite(it) }
@@ -546,6 +582,7 @@ fun NavigationSimulationScreen(
                                         route = route,
                                         isFav = route.isFavorite,
                                         showMoveButtons = false,
+                                        showHelp = showHelp,
                                         onSelect = { viewModel.selectHistoryRoute(route) },
                                         onToggleFavorite = {
                                             route.id.toLongOrNull()?.let { viewModel.toggleFavorite(it) }
@@ -638,6 +675,29 @@ fun NavigationSimulationScreen(
 
             }
         }
+        HelpOverlayScrim(
+            showHelp = showHelp,
+            entries = listOf(
+                1 to R.string.help_nav_sim_menu,
+                2 to R.string.help_nav_sim_clear_points,
+                3 to R.string.help_nav_sim_plan_start,
+                4 to R.string.help_nav_sim_pause_resume,
+                5 to R.string.help_nav_sim_stop,
+                6 to R.string.help_nav_sim_multi_route,
+                7 to R.string.help_nav_sim_speed,
+                8 to R.string.help_nav_sim_plan_fab,
+                9 to R.string.help_nav_sim_tab_favorites,
+                10 to R.string.help_nav_sim_tab_history,
+                11 to R.string.help_nav_sim_search,
+                12 to R.string.help_nav_sim_clear_search,
+                13 to R.string.help_nav_sim_history_select,
+                14 to R.string.help_nav_sim_history_rename,
+                15 to R.string.help_nav_sim_history_delete,
+                16 to R.string.help_nav_sim_history_favorite
+            ),
+            onDismiss = { showHelp = false }
+        )
+        }
     }
 }
 
@@ -646,6 +706,7 @@ fun NavigationHistoryCard(
     route: RouteInfo,
     isFav: Boolean,
     showMoveButtons: Boolean = false,
+    showHelp: Boolean = false,
     onSelect: () -> Unit,
     onToggleFavorite: () -> Unit,
     onRename: () -> Unit = {},
@@ -653,86 +714,94 @@ fun NavigationHistoryCard(
     onMoveUp: () -> Unit = {},
     onMoveDown: () -> Unit = {}
 ) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 10.dp)
-            .clickable { onSelect() },
-        shape = RoundedCornerShape(8.dp)
-    ) {
-        Row(
-            modifier = Modifier.padding(start = 16.dp, end = 4.dp),
-            verticalAlignment = Alignment.CenterVertically
+    BadgedControl(show = showHelp, number = 13) {
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 10.dp)
+                .clickable { onSelect() },
+            shape = RoundedCornerShape(8.dp)
         ) {
-            if (showMoveButtons) {
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    modifier = Modifier.padding(end = 4.dp)
-                ) {
-                    Text("▲", modifier = Modifier.clickable(onClick = onMoveUp).padding(2.dp), fontSize = 12.sp, color = Color.Gray)
-                    Text("▼", modifier = Modifier.clickable(onClick = onMoveDown).padding(2.dp), fontSize = 12.sp, color = Color.Gray)
-                }
-            }
-            Text(
-                text = "${route.startName} -> ${route.endName}",
-                modifier = Modifier.weight(1f),
-                style = MaterialTheme.typography.bodyMedium
-            )
-            IconButton(onClick = onRename) {
-                Icon(Icons.Default.Edit, contentDescription = "Rename", tint = MaterialTheme.colorScheme.primary)
-            }
-            val context = LocalContext.current
-            val prefs = remember { PreferenceManager.getDefaultSharedPreferences(context) }
-            val showDeleteConfirm = remember { mutableStateOf(false) }
-            var dontRemind by remember { mutableStateOf(false) }
-            IconButton(onClick = {
-                if (System.currentTimeMillis() < prefs.getLong("delete_dont_remind_until", 0L)) {
-                    onDelete()
-                } else {
-                    showDeleteConfirm.value = true
-                    dontRemind = false
-                }
-            }) {
-                Icon(Icons.Default.Delete, contentDescription = "Delete", tint = Color.Red)
-            }
-            if (showDeleteConfirm.value) {
-                AlertDialog(
-                    onDismissRequest = { showDeleteConfirm.value = false },
-                    title = { Text(stringResource(R.string.common_warning)) },
-                    text = {
-                        Column {
-                            Text(stringResource(R.string.common_delete_item_confirm))
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Checkbox(checked = dontRemind, onCheckedChange = { dontRemind = it })
-                                Text(stringResource(R.string.delete_dont_remind_10min), fontSize = 14.sp)
-                            }
-                        }
-                    },
-                    confirmButton = {
-                        TextButton(onClick = {
-                            if (dontRemind) {
-                                prefs.edit().putLong("delete_dont_remind_until", System.currentTimeMillis() + 10 * 60 * 1000).apply()
-                            }
-                            showDeleteConfirm.value = false; onDelete()
-                        }) {
-                            Text(stringResource(R.string.common_confirm))
-                        }
-                    },
-                    dismissButton = {
-                        TextButton(onClick = { showDeleteConfirm.value = false }) {
-                            Text(stringResource(R.string.common_cancel))
-                        }
+            Row(
+                modifier = Modifier.padding(start = 16.dp, end = 4.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                if (showMoveButtons) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = Modifier.padding(end = 4.dp)
+                    ) {
+                        Text("▲", modifier = Modifier.clickable(onClick = onMoveUp).padding(2.dp), fontSize = 12.sp, color = Color.Gray)
+                        Text("▼", modifier = Modifier.clickable(onClick = onMoveDown).padding(2.dp), fontSize = 12.sp, color = Color.Gray)
                     }
+                }
+                Text(
+                    text = "${route.startName} -> ${route.endName}",
+                    modifier = Modifier.weight(1f),
+                    style = MaterialTheme.typography.bodyMedium
                 )
-            }
-            IconButton(onClick = onToggleFavorite) {
-                Icon(
-                    Icons.Default.Star,
-                    contentDescription = "Favorite",
-                    tint = if (isFav) Color(0xFFFFB300) else Color.Gray,
-                    modifier = Modifier.graphicsLayer(alpha = if (isFav) 1f else 0.4f)
-                )
+                BadgedControl(show = showHelp, number = 14) {
+                    IconButton(onClick = onRename) {
+                        Icon(Icons.Default.Edit, contentDescription = "Rename", tint = MaterialTheme.colorScheme.primary)
+                    }
+                }
+                val context = LocalContext.current
+                val prefs = remember { PreferenceManager.getDefaultSharedPreferences(context) }
+                val showDeleteConfirm = remember { mutableStateOf(false) }
+                var dontRemind by remember { mutableStateOf(false) }
+                BadgedControl(show = showHelp, number = 15) {
+                    IconButton(onClick = {
+                        if (System.currentTimeMillis() < prefs.getLong("delete_dont_remind_until", 0L)) {
+                            onDelete()
+                        } else {
+                            showDeleteConfirm.value = true
+                            dontRemind = false
+                        }
+                    }) {
+                        Icon(Icons.Default.Delete, contentDescription = "Delete", tint = Color.Red)
+                    }
+                }
+                if (showDeleteConfirm.value) {
+                    AlertDialog(
+                        onDismissRequest = { showDeleteConfirm.value = false },
+                        title = { Text(stringResource(R.string.common_warning)) },
+                        text = {
+                            Column {
+                                Text(stringResource(R.string.common_delete_item_confirm))
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Checkbox(checked = dontRemind, onCheckedChange = { dontRemind = it })
+                                    Text(stringResource(R.string.delete_dont_remind_10min), fontSize = 14.sp)
+                                }
+                            }
+                        },
+                        confirmButton = {
+                            TextButton(onClick = {
+                                if (dontRemind) {
+                                    prefs.edit().putLong("delete_dont_remind_until", System.currentTimeMillis() + 10 * 60 * 1000).apply()
+                                }
+                                showDeleteConfirm.value = false; onDelete()
+                            }) {
+                                Text(stringResource(R.string.common_confirm))
+                            }
+                        },
+                        dismissButton = {
+                            TextButton(onClick = { showDeleteConfirm.value = false }) {
+                                Text(stringResource(R.string.common_cancel))
+                            }
+                        }
+                    )
+                }
+                BadgedControl(show = showHelp, number = 16) {
+                    IconButton(onClick = onToggleFavorite) {
+                        Icon(
+                            Icons.Default.Star,
+                            contentDescription = "Favorite",
+                            tint = if (isFav) Color(0xFFFFB300) else Color.Gray,
+                            modifier = Modifier.graphicsLayer(alpha = if (isFav) 1f else 0.4f)
+                        )
+                    }
+                }
             }
         }
     }

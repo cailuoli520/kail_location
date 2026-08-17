@@ -29,6 +29,9 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.kail.location.R
 import com.kail.location.viewmodels.CameraSimulationViewModel
 import com.kail.location.views.common.AppDrawer
+import com.kail.location.views.common.BadgedControl
+import com.kail.location.views.common.HelpActionButton
+import com.kail.location.views.common.HelpOverlayScrim
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -52,6 +55,7 @@ fun CameraSimulationScreen(
 
     val drawerState = rememberDrawerState(DrawerValue.Closed)
     val scope = rememberCoroutineScope()
+    var showHelp by remember { mutableStateOf(false) }
 
     val videoPicker = rememberLauncherForActivityResult(
         ActivityResultContracts.GetContent()
@@ -82,30 +86,36 @@ fun CameraSimulationScreen(
             )
         }
     ) {
+        Box {
         Scaffold(
             topBar = {
                 TopAppBar(
                     title = { Text(stringResource(R.string.camera_sim_title), color = Color.White) },
                     navigationIcon = {
-                        IconButton(onClick = {
-                            scope.launch { drawerState.animateTo(DrawerValue.Open, tween(durationMillis = 160)) }
-                        }) {
-                            Icon(Icons.Default.Menu, contentDescription = "Menu", tint = Color.White)
+                        BadgedControl(show = showHelp, number = 1) {
+                            IconButton(onClick = {
+                                scope.launch { drawerState.animateTo(DrawerValue.Open, tween(durationMillis = 160)) }
+                            }) {
+                                Icon(Icons.Default.Menu, contentDescription = "Menu", tint = Color.White)
+                            }
                         }
                     },
                     colors = TopAppBarDefaults.topAppBarColors(
                         containerColor = MaterialTheme.colorScheme.primary
                     ),
                     actions = {
+                        HelpActionButton(showHelp = showHelp) { showHelp = true }
                         val context = LocalContext.current
-                        IconButton(onClick = {
-                            context.startActivity(android.content.Intent(context, CameraSettingsActivity::class.java))
-                        }) {
-                            Icon(
-                                Icons.Default.Settings,
-                                contentDescription = "Settings",
-                                tint = Color.White
-                            )
+                        BadgedControl(show = showHelp, number = 2) {
+                            IconButton(onClick = {
+                                context.startActivity(android.content.Intent(context, CameraSettingsActivity::class.java))
+                            }) {
+                                Icon(
+                                    Icons.Default.Settings,
+                                    contentDescription = "Settings",
+                                    tint = Color.White
+                                )
+                            }
                         }
                     }
                 )
@@ -163,17 +173,19 @@ fun CameraSimulationScreen(
                                     verticalAlignment = Alignment.CenterVertically,
                                     modifier = Modifier.fillMaxWidth()
                                 ) {
-                                    Button(
-                                        onClick = { viewModel.setEnabled(!enabled) },
-                                        colors = ButtonDefaults.buttonColors(
-                                            containerColor = if (enabled) Color.Red else MaterialTheme.colorScheme.primary
-                                        ),
-                                        shape = RoundedCornerShape(24.dp)
-                                    ) {
-                                        Text(
-                                            if (enabled) stringResource(R.string.camera_sim_stop)
-                                            else stringResource(R.string.camera_sim_start)
-                                        )
+                                    BadgedControl(show = showHelp, number = 3) {
+                                        Button(
+                                            onClick = { viewModel.setEnabled(!enabled) },
+                                            colors = ButtonDefaults.buttonColors(
+                                                containerColor = if (enabled) Color.Red else MaterialTheme.colorScheme.primary
+                                            ),
+                                            shape = RoundedCornerShape(24.dp)
+                                        ) {
+                                            Text(
+                                                if (enabled) stringResource(R.string.camera_sim_stop)
+                                                else stringResource(R.string.camera_sim_start)
+                                            )
+                                        }
                                     }
                                     Spacer(modifier = Modifier.weight(1f))
                                 }
@@ -181,15 +193,19 @@ fun CameraSimulationScreen(
                         }
 
                         // FAB overlapping the card corner — pick video
-                        FloatingActionButton(
-                            onClick = { videoPicker.launch("video/*") },
-                            containerColor = MaterialTheme.colorScheme.secondary,
-                            shape = CircleShape,
-                            modifier = Modifier
-                                .align(Alignment.TopEnd)
-                                .size(48.dp)
+                        BadgedControl(
+                            show = showHelp,
+                            number = 4,
+                            modifier = Modifier.align(Alignment.TopEnd)
                         ) {
-                            Icon(Icons.Default.Add, contentDescription = "Pick video", tint = Color.White)
+                            FloatingActionButton(
+                                onClick = { videoPicker.launch("video/*") },
+                                containerColor = MaterialTheme.colorScheme.secondary,
+                                shape = CircleShape,
+                                modifier = Modifier.size(48.dp)
+                            ) {
+                                Icon(Icons.Default.Add, contentDescription = "Pick video", tint = Color.White)
+                            }
                         }
                     }
 
@@ -227,46 +243,50 @@ fun CameraSimulationScreen(
                         ) {
                             items(videoLibrary, key = { it }) { video ->
                                 val isCurrent = video == videoName
-                                Card(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .clickable { viewModel.selectVideo(video) },
-                                    shape = RoundedCornerShape(8.dp),
-                                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-                                    colors = CardDefaults.cardColors(
-                                        containerColor = if (isCurrent)
-                                            MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
-                                        else
-                                            MaterialTheme.colorScheme.surface
-                                    )
-                                ) {
-                                    Row(
+                                BadgedControl(show = showHelp, number = 5) {
+                                    Card(
                                         modifier = Modifier
                                             .fillMaxWidth()
-                                            .padding(start = 16.dp, top = 4.dp, bottom = 4.dp, end = 4.dp),
-                                        verticalAlignment = Alignment.CenterVertically
+                                            .clickable { viewModel.selectVideo(video) },
+                                        shape = RoundedCornerShape(8.dp),
+                                        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                                        colors = CardDefaults.cardColors(
+                                            containerColor = if (isCurrent)
+                                                MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
+                                            else
+                                                MaterialTheme.colorScheme.surface
+                                        )
                                     ) {
-                                        Column(modifier = Modifier.weight(1f)) {
-                                            Text(
-                                                text = video,
-                                                style = MaterialTheme.typography.bodyLarge,
-                                                fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Medium,
-                                                color = if (isCurrent) MaterialTheme.colorScheme.primary else Color.Unspecified
-                                            )
-                                            if (isCurrent) {
+                                        Row(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(start = 16.dp, top = 4.dp, bottom = 4.dp, end = 4.dp),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Column(modifier = Modifier.weight(1f)) {
                                                 Text(
-                                                    text = stringResource(R.string.camera_sim_video_in_use),
-                                                    style = MaterialTheme.typography.bodySmall,
-                                                    color = MaterialTheme.colorScheme.primary
+                                                    text = video,
+                                                    style = MaterialTheme.typography.bodyLarge,
+                                                    fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Medium,
+                                                    color = if (isCurrent) MaterialTheme.colorScheme.primary else Color.Unspecified
                                                 )
+                                                if (isCurrent) {
+                                                    Text(
+                                                        text = stringResource(R.string.camera_sim_video_in_use),
+                                                        style = MaterialTheme.typography.bodySmall,
+                                                        color = MaterialTheme.colorScheme.primary
+                                                    )
+                                                }
                                             }
-                                        }
-                                        IconButton(onClick = { viewModel.deleteVideo(video) }) {
-                                            Icon(
-                                                Icons.Default.Close,
-                                                contentDescription = "Delete",
-                                                tint = Color.Gray
-                                            )
+                                            BadgedControl(show = showHelp, number = 6) {
+                                                IconButton(onClick = { viewModel.deleteVideo(video) }) {
+                                                    Icon(
+                                                        Icons.Default.Close,
+                                                        contentDescription = "Delete",
+                                                        tint = Color.Gray
+                                                    )
+                                                }
+                                            }
                                         }
                                     }
                                 }
@@ -274,6 +294,19 @@ fun CameraSimulationScreen(
                         }
                 }
             }
+        }
+        HelpOverlayScrim(
+            showHelp = showHelp,
+            entries = listOf(
+                1 to R.string.help_camera_sim_menu,
+                2 to R.string.help_camera_sim_settings,
+                3 to R.string.help_camera_sim_toggle,
+                4 to R.string.help_camera_sim_pick_video,
+                5 to R.string.help_camera_sim_select_video,
+                6 to R.string.help_camera_sim_delete_video
+            ),
+            onDismiss = { showHelp = false }
+        )
         }
     }
 }

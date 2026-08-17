@@ -38,6 +38,9 @@ import androidx.preference.PreferenceManager
 import com.kail.location.utils.MapUtils
 import com.kail.location.R
 import com.kail.location.views.common.AppDrawer
+import com.kail.location.views.common.BadgedControl
+import com.kail.location.views.common.HelpActionButton
+import com.kail.location.views.common.HelpOverlayScrim
 
 import kotlinx.coroutines.launch
 import android.graphics.Bitmap
@@ -133,6 +136,7 @@ fun RoutePlanScreen(
     val scope = rememberCoroutineScope()
     var showMapTypeDialog by remember { mutableStateOf(false) }
     var showLocationInputDialog by remember { mutableStateOf(false) }
+    var showHelp by remember { mutableStateOf(false) }
 
     // Search state
     var isSearchActive by remember { mutableStateOf(false) }
@@ -422,6 +426,7 @@ fun RoutePlanScreen(
             )
         }
     ) {
+        Box {
         Scaffold(
             topBar = {
                 if (isSearchActive) {
@@ -482,13 +487,18 @@ fun RoutePlanScreen(
                     TopAppBar(
                         title = { Text(stringResource(R.string.app_name)) },
                         navigationIcon = {
-                            IconButton(onClick = onBackClick) {
-                                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                            BadgedControl(show = showHelp, number = 1) {
+                                IconButton(onClick = onBackClick) {
+                                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                                }
                             }
                         },
                         actions = {
-                            IconButton(onClick = { isSearchActive = true }) {
-                                Icon(Icons.Default.Search, contentDescription = "Search")
+                            HelpActionButton(showHelp = showHelp) { showHelp = true }
+                            BadgedControl(show = showHelp, number = 2) {
+                                IconButton(onClick = { isSearchActive = true }) {
+                                    Icon(Icons.Default.Search, contentDescription = "Search")
+                                }
                             }
                         },
                         colors = TopAppBarDefaults.topAppBarColors(
@@ -537,15 +547,19 @@ fun RoutePlanScreen(
                         .align(Alignment.TopEnd)
                         .padding(top = 8.dp, end = 8.dp)
                 ) {
-                    MapControlButton(
-                        iconRes = R.drawable.ic_map,
-                        onClick = { showMapTypeDialog = true }
-                    )
+                    BadgedControl(show = showHelp, number = 3) {
+                        MapControlButton(
+                            iconRes = R.drawable.ic_map,
+                            onClick = { showMapTypeDialog = true }
+                        )
+                    }
                     Spacer(modifier = Modifier.height(16.dp))
-                    MapControlButton(
-                        iconRes = R.drawable.ic_history,
-                        onClick = { showHistoryPicker = true }
-                    )
+                    BadgedControl(show = showHelp, number = 4) {
+                        MapControlButton(
+                            iconRes = R.drawable.ic_history,
+                            onClick = { showHistoryPicker = true }
+                        )
+                    }
                 }
 
                 Column(
@@ -553,25 +567,33 @@ fun RoutePlanScreen(
                         .align(Alignment.CenterEnd)
                         .padding(end = 8.dp)
                 ) {
-                    MapControlButton(
-                        iconRes = R.drawable.ic_input,
-                        onClick = { showLocationInputDialog = true }
-                    )
+                    BadgedControl(show = showHelp, number = 5) {
+                        MapControlButton(
+                            iconRes = R.drawable.ic_input,
+                            onClick = { showLocationInputDialog = true }
+                        )
+                    }
                     Spacer(modifier = Modifier.height(16.dp))
-                    MapControlButton(
-                        iconRes = R.drawable.ic_home_position,
-                        onClick = { onLocateClick?.invoke() }
-                    )
+                    BadgedControl(show = showHelp, number = 6) {
+                        MapControlButton(
+                            iconRes = R.drawable.ic_home_position,
+                            onClick = { onLocateClick?.invoke() }
+                        )
+                    }
                     Spacer(modifier = Modifier.height(16.dp))
-                    MapControlButton(
-                        iconRes = R.drawable.ic_zoom_in,
-                        onClick = { mapView?.map?.setMapStatus(MapStatusUpdateFactory.zoomIn()) }
-                    )
+                    BadgedControl(show = showHelp, number = 7) {
+                        MapControlButton(
+                            iconRes = R.drawable.ic_zoom_in,
+                            onClick = { mapView?.map?.setMapStatus(MapStatusUpdateFactory.zoomIn()) }
+                        )
+                    }
                     Spacer(modifier = Modifier.height(16.dp))
-                    MapControlButton(
-                        iconRes = R.drawable.ic_zoom_out,
-                        onClick = { mapView?.map?.setMapStatus(MapStatusUpdateFactory.zoomOut()) }
-                    )
+                    BadgedControl(show = showHelp, number = 8) {
+                        MapControlButton(
+                            iconRes = R.drawable.ic_zoom_out,
+                            onClick = { mapView?.map?.setMapStatus(MapStatusUpdateFactory.zoomOut()) }
+                        )
+                    }
                 }
 
                 // Route Plan Bottom Buttons
@@ -580,134 +602,161 @@ fun RoutePlanScreen(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
-                    SmallFloatingActionButton(onClick = {
-                        try {
-                            if (markingPhase == MarkingPhase.Active) {
-                                dashedOverlay?.remove()
-                                dashedOverlay = null
-                                isDragging = false
-                            }
-                            if (waypoints.isNotEmpty()) {
-                                waypoints.removeAt(waypoints.lastIndex)
-                                if (waitTimes.isNotEmpty()) waitTimes.removeAt(waitTimes.lastIndex)
-                                polylineOverlay?.remove()
-                                polylineOverlay = null
-                                val map = mapView?.map
-                                if (map != null && waypoints.size >= 2) {
-                                    val polyOpt = PolylineOptions().width(8).color(AndroidColor.BLUE).points(waypoints)
-                                    polylineOverlay = map.addOverlay(polyOpt)
+                    BadgedControl(show = showHelp, number = 9) {
+                        SmallFloatingActionButton(onClick = {
+                            try {
+                                if (markingPhase == MarkingPhase.Active) {
+                                    dashedOverlay?.remove()
+                                    dashedOverlay = null
+                                    isDragging = false
                                 }
                                 if (waypoints.isNotEmpty()) {
-                                    val last = waypoints.last()
-                                    endPoint = "${last.latitude},${last.longitude}"
-                                    currentAnchor = last
-                                } else {
-                                    startPoint = ""
-                                    endPoint = ""
-                                    selectingStart = true
-                                    currentAnchor = null
+                                    waypoints.removeAt(waypoints.lastIndex)
+                                    if (waitTimes.isNotEmpty()) waitTimes.removeAt(waitTimes.lastIndex)
+                                    polylineOverlay?.remove()
+                                    polylineOverlay = null
+                                    val map = mapView?.map
+                                    if (map != null && waypoints.size >= 2) {
+                                        val polyOpt = PolylineOptions().width(8).color(AndroidColor.BLUE).points(waypoints)
+                                        polylineOverlay = map.addOverlay(polyOpt)
+                                    }
+                                    if (waypoints.isNotEmpty()) {
+                                        val last = waypoints.last()
+                                        endPoint = "${last.latitude},${last.longitude}"
+                                        currentAnchor = last
+                                    } else {
+                                        startPoint = ""
+                                        endPoint = ""
+                                        selectingStart = true
+                                        currentAnchor = null
+                                    }
                                 }
+                                KailLog.i(context, "RoutePlanScreen", "Undo last waypoint, now size=${waypoints.size}")
+                            } catch (e: Exception) {
+                                KailLog.e(context, "RoutePlanScreen", "Undo error: ${e.message}")
                             }
-                            KailLog.i(context, "RoutePlanScreen", "Undo last waypoint, now size=${waypoints.size}")
-                        } catch (e: Exception) {
-                            KailLog.e(context, "RoutePlanScreen", "Undo error: ${e.message}")
+                        },
+                        modifier = Modifier.alpha(if (waypoints.isNotEmpty()) 1f else 0f),
+                        containerColor = Color.White, contentColor = MaterialTheme.colorScheme.primary) {
+                            Icon(painter = painterResource(id = R.drawable.ic_left), contentDescription = null)
                         }
-                    },
-                    modifier = Modifier.alpha(if (waypoints.isNotEmpty()) 1f else 0f),
-                    containerColor = Color.White, contentColor = MaterialTheme.colorScheme.primary) {
-                        Icon(painter = painterResource(id = R.drawable.ic_left), contentDescription = null)
                     }
 
                     // Switch Mark Mode
-                    FloatingActionButton(
-                        onClick = {
-                            try {
-                                val map = mapView?.map
-                                val center = map?.mapStatus?.target
-                                when (markingPhase) {
-                                    MarkingPhase.Idle -> {
-                                        currentAnchor = center
-                                        markingPhase = MarkingPhase.Preview
-                                    }
-                                    MarkingPhase.Preview -> {
-                                        currentAnchor = center
-                                        if (center != null && waypoints.isEmpty()) {
-                                            waypoints.add(center)
-                                            waitTimes.add(0)
-                                            startPoint = "${center.latitude},${center.longitude}"
-                                            selectingStart = false
+                    BadgedControl(show = showHelp, number = 10) {
+                        FloatingActionButton(
+                            onClick = {
+                                try {
+                                    val map = mapView?.map
+                                    val center = map?.mapStatus?.target
+                                    when (markingPhase) {
+                                        MarkingPhase.Idle -> {
+                                            currentAnchor = center
+                                            markingPhase = MarkingPhase.Preview
                                         }
-                                        markingPhase = MarkingPhase.Active
+                                        MarkingPhase.Preview -> {
+                                            currentAnchor = center
+                                            if (center != null && waypoints.isEmpty()) {
+                                                waypoints.add(center)
+                                                waitTimes.add(0)
+                                                startPoint = "${center.latitude},${center.longitude}"
+                                                selectingStart = false
+                                            }
+                                            markingPhase = MarkingPhase.Active
+                                        }
+                                        MarkingPhase.Active -> {
+                                            dashedOverlay?.remove()
+                                            dashedOverlay = null
+                                            isDragging = false
+                                            currentAnchor = null
+                                            markingPhase = MarkingPhase.Idle
+                                        }
                                     }
-                                    MarkingPhase.Active -> {
-                                        dashedOverlay?.remove()
-                                        dashedOverlay = null
-                                        isDragging = false
-                                        currentAnchor = null
-                                        markingPhase = MarkingPhase.Idle
-                                    }
+                                    KailLog.i(context, "RoutePlanScreen", "Marking phase ${markingPhase}")
+                                } catch (e: Exception) {
+                                    KailLog.e(context, "RoutePlanScreen", "Toggle mark mode error: ${e.message}")
                                 }
-                                KailLog.i(context, "RoutePlanScreen", "Marking phase ${markingPhase}")
-                            } catch (e: Exception) {
-                                KailLog.e(context, "RoutePlanScreen", "Toggle mark mode error: ${e.message}")
-                            }
-                        },
-                        containerColor = if (markingPhase != MarkingPhase.Idle) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface,
-                        shape = CircleShape
-                    ) {
-                        Icon(
-                            painter = painterResource(id = R.drawable.ic_position),
-                            contentDescription = "Mark Mode",
-                            tint = if (markingPhase != MarkingPhase.Idle) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
-                        )
+                            },
+                            containerColor = if (markingPhase != MarkingPhase.Idle) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface,
+                            shape = CircleShape
+                        ) {
+                            Icon(
+                                painter = painterResource(id = R.drawable.ic_position),
+                                contentDescription = "Mark Mode",
+                                tint = if (markingPhase != MarkingPhase.Idle) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
+                            )
+                        }
                     }
 
                     // Wait time per waypoint
-                    FloatingActionButton(
-                        onClick = { showWaitDialog = true },
-                        containerColor = if (showWaitDialog) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface,
-                        shape = CircleShape,
-                        modifier = Modifier.alpha(if (waypoints.isNotEmpty()) 1f else 0f)
-                    ) {
-                        Text(
-                            text = stringResource(R.string.route_plan_wait_btn),
-                            color = if (showWaitDialog) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.secondary,
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.Bold
-                        )
+                    BadgedControl(show = showHelp, number = 11) {
+                        FloatingActionButton(
+                            onClick = { showWaitDialog = true },
+                            containerColor = if (showWaitDialog) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface,
+                            shape = CircleShape,
+                            modifier = Modifier.alpha(if (waypoints.isNotEmpty()) 1f else 0f)
+                        ) {
+                            Text(
+                                text = stringResource(R.string.route_plan_wait_btn),
+                                color = if (showWaitDialog) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.secondary,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
                     }
 
                     // Confirm and Save
-                    FloatingActionButton(
-                        onClick = {
-                            try {
-                                if (waypoints.size >= 2) {
-                                    when {
-                                        extendBaseCount > 0 && onExtendConfirm != null -> {
-                                            onExtendConfirm(waypoints.toList(), waitTimes.toList())
-                                            KailLog.i(context, "RoutePlanScreen", "Extended running route with ${waypoints.size} points (base=$extendBaseCount)")
-                                        }
-                                        editingRouteId != null -> {
-                                            viewModel.updateRoute(editingRouteId, waypoints.toList(), waitTimes.toList())
-                                            KailLog.i(context, "RoutePlanScreen", "Updated route ${editingRouteId} with ${waypoints.size} points")
-                                        }
-                                        else -> {
-                                            viewModel.setPendingRoutePoints(waypoints.toList(), waitTimes.toList())
-                                            KailLog.i(context, "RoutePlanScreen", "Set pending route with ${waypoints.size} points")
+                    BadgedControl(show = showHelp, number = 12) {
+                        FloatingActionButton(
+                            onClick = {
+                                try {
+                                    if (waypoints.size >= 2) {
+                                        when {
+                                            extendBaseCount > 0 && onExtendConfirm != null -> {
+                                                onExtendConfirm(waypoints.toList(), waitTimes.toList())
+                                                KailLog.i(context, "RoutePlanScreen", "Extended running route with ${waypoints.size} points (base=$extendBaseCount)")
+                                            }
+                                            editingRouteId != null -> {
+                                                viewModel.updateRoute(editingRouteId, waypoints.toList(), waitTimes.toList())
+                                                KailLog.i(context, "RoutePlanScreen", "Updated route ${editingRouteId} with ${waypoints.size} points")
+                                            }
+                                            else -> {
+                                                viewModel.setPendingRoutePoints(waypoints.toList(), waitTimes.toList())
+                                                KailLog.i(context, "RoutePlanScreen", "Set pending route with ${waypoints.size} points")
+                                            }
                                         }
                                     }
+                                    onConfirmClick()
+                                } catch (e: Exception) {
+                                    KailLog.e(context, "RoutePlanScreen", "Save route error: ${e.message}")
                                 }
-                                onConfirmClick()
-                            } catch (e: Exception) {
-                                KailLog.e(context, "RoutePlanScreen", "Save route error: ${e.message}")
-                            }
-                        },
-                        containerColor = MaterialTheme.colorScheme.secondary
-                    ) {
-                        Icon(imageVector = Icons.Default.Check, contentDescription = null, tint = Color.White)
+                            },
+                            containerColor = MaterialTheme.colorScheme.secondary
+                        ) {
+                            Icon(imageVector = Icons.Default.Check, contentDescription = null, tint = Color.White)
+                        }
                     }
                 }
             }
+        }
+        HelpOverlayScrim(
+            showHelp = showHelp,
+            entries = listOf(
+                1 to R.string.help_route_plan_back,
+                2 to R.string.help_route_plan_search,
+                3 to R.string.help_route_plan_map_type,
+                4 to R.string.help_route_plan_history,
+                5 to R.string.help_route_plan_input,
+                6 to R.string.help_route_plan_locate,
+                7 to R.string.help_route_plan_zoom_in,
+                8 to R.string.help_route_plan_zoom_out,
+                9 to R.string.help_route_plan_undo,
+                10 to R.string.help_route_plan_mark_mode,
+                11 to R.string.help_route_plan_wait,
+                12 to R.string.help_route_plan_confirm
+            ),
+            onDismiss = { showHelp = false }
+        )
         }
     }
 

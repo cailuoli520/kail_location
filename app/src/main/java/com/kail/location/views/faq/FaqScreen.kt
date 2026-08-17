@@ -29,6 +29,9 @@ import androidx.core.view.setPadding
 import com.kail.location.R
 import com.kail.location.network.RuoYiClient
 import com.kail.location.viewmodels.FaqViewModel
+import com.kail.location.views.common.BadgedControl
+import com.kail.location.views.common.HelpActionButton
+import com.kail.location.views.common.HelpOverlayScrim
 import io.noties.markwon.Markwon
 import io.noties.markwon.image.coil.CoilImagesPlugin
 
@@ -39,24 +42,31 @@ fun FaqScreen(
     onBackClick: () -> Unit
 ) {
     val context = LocalContext.current
+    var showHelp by remember { mutableStateOf(false) }
     val markwon = remember(context) {
         Markwon.builder(context)
             .usePlugin(CoilImagesPlugin.create(context))
             .build()
     }
 
+    Box {
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { Text(stringResource(R.string.faq_title)) },
                 navigationIcon = {
-                    IconButton(onClick = onBackClick) {
-                        Icon(
-                            Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = stringResource(R.string.checkout_back_desc),
-                            tint = Color.White
-                        )
+                    BadgedControl(show = showHelp, number = 1) {
+                        IconButton(onClick = onBackClick) {
+                            Icon(
+                                Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = stringResource(R.string.checkout_back_desc),
+                                tint = Color.White
+                            )
+                        }
                     }
+                },
+                actions = {
+                    HelpActionButton(showHelp = showHelp) { showHelp = true }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.primary,
@@ -87,8 +97,10 @@ fun FaqScreen(
                             color = Color.Gray
                         )
                         Spacer(modifier = Modifier.height(16.dp))
-                        Button(onClick = { viewModel.retry() }) {
-                            Text(stringResource(R.string.faq_retry))
+                        BadgedControl(show = showHelp, number = 2) {
+                            Button(onClick = { viewModel.retry() }) {
+                                Text(stringResource(R.string.faq_retry))
+                            }
                         }
                     }
                 }
@@ -108,12 +120,14 @@ fun FaqScreen(
                         verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
                         items(viewModel.faqList, key = { it.id }) { item ->
-                            FaqCard(
-                                item = item,
-                                expanded = viewModel.expandedId == item.id,
-                                onToggle = { viewModel.toggle(item.id) },
-                                markwon = markwon
-                            )
+                            BadgedControl(show = showHelp, number = 3) {
+                                FaqCard(
+                                    item = item,
+                                    expanded = viewModel.expandedId == item.id,
+                                    onToggle = { viewModel.toggle(item.id) },
+                                    markwon = markwon
+                                )
+                            }
                         }
                         if (viewModel.lastUpdatedAt != null) {
                             item {
@@ -132,6 +146,16 @@ fun FaqScreen(
                 }
             }
         }
+    }
+        HelpOverlayScrim(
+            showHelp = showHelp,
+            entries = listOf(
+                1 to R.string.help_faq_back,
+                2 to R.string.help_faq_retry,
+                3 to R.string.help_faq_card
+            ),
+            onDismiss = { showHelp = false }
+        )
     }
 }
 

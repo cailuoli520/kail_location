@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="help_root_hide_menu">サイドメニューを開く</string>
+    <string name="help_root_hide_hide_root_switch">Root権限を隠すスイッチ</string>
+    <string name="help_root_hide_hide_applist_switch">アプリ一覧の非表示スイッチ</string>
+    <string name="help_root_hide_target_apps">非表示にするアプリを選択</string>
+    <string name="help_root_hide_start_stop">非表示機能を開始 / 停止</string>
+</resources>

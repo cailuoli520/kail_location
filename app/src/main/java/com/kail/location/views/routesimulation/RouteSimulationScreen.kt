@@ -46,6 +46,9 @@ import android.content.Intent
 import android.net.Uri
 import com.kail.location.views.common.UpdateDialog
 import com.kail.location.views.common.AppDrawer
+import com.kail.location.views.common.BadgedControl
+import com.kail.location.views.common.HelpActionButton
+import com.kail.location.views.common.HelpOverlayScrim
 
 
 /**
@@ -79,6 +82,7 @@ fun RouteSimulationScreen(
     var showSettingsDialog by remember { mutableStateOf(false) }
     var renameTarget by remember { mutableStateOf<RouteInfo?>(null) }
     var renameText by remember { mutableStateOf("") }
+    var showHelp by remember { mutableStateOf(false) }
     
     val historyRoutes by viewModel.historyRoutes.collectAsState()
     val selectedId by viewModel.selectedRouteId.collectAsState()
@@ -154,18 +158,24 @@ fun RouteSimulationScreen(
             )
         }
     ) {
+        Box {
         Scaffold(
             topBar = {
                 TopAppBar(
                     title = { Text(stringResource(R.string.route_sim_title)) },
                     navigationIcon = {
-                        IconButton(onClick = { scope.launch { drawerState.animateTo(DrawerValue.Open, androidx.compose.animation.core.tween(durationMillis = 160)) } }) {
-                            Icon(
-                                imageVector = Icons.Default.Menu,
-                                contentDescription = "Menu",
-                                tint = Color.White
-                            )
+                        BadgedControl(show = showHelp, number = 1) {
+                            IconButton(onClick = { scope.launch { drawerState.animateTo(DrawerValue.Open, androidx.compose.animation.core.tween(durationMillis = 160)) } }) {
+                                Icon(
+                                    imageVector = Icons.Default.Menu,
+                                    contentDescription = "Menu",
+                                    tint = Color.White
+                                )
+                            }
                         }
+                    },
+                    actions = {
+                        HelpActionButton(showHelp = showHelp) { showHelp = true }
                     },
                     colors = TopAppBarDefaults.topAppBarColors(
                         containerColor = MaterialTheme.colorScheme.primary,
@@ -201,20 +211,25 @@ fun RouteSimulationScreen(
                             onStopSimulation = onStopSimulation,
                             isPaused = isPaused,
                             onPauseResume = { if (isPaused) viewModel.resumeSimulation() else viewModel.pauseSimulation() },
+                            showHelp = showHelp,
                             modifier = Modifier.padding(top = 16.dp)
                         )
                         
                         // FAB overlapping the card
-                        FloatingActionButton(
-                            onClick = { if (isSimulating) onExtendRouteClick() else onAddRouteClick() },
-                            containerColor = MaterialTheme.colorScheme.primary,
-                            contentColor = Color.White,
-                            shape = CircleShape,
-                            modifier = Modifier
-                                .align(Alignment.TopEnd)
-                                .size(48.dp)
+                        BadgedControl(
+                            show = showHelp,
+                            number = 2,
+                            modifier = Modifier.align(Alignment.TopEnd)
                         ) {
-                            Icon(Icons.Default.Add, contentDescription = "Add", tint = Color.White)
+                            FloatingActionButton(
+                                onClick = { if (isSimulating) onExtendRouteClick() else onAddRouteClick() },
+                                containerColor = MaterialTheme.colorScheme.primary,
+                                contentColor = Color.White,
+                                shape = CircleShape,
+                                modifier = Modifier.size(48.dp)
+                            ) {
+                                Icon(Icons.Default.Add, contentDescription = "Add", tint = Color.White)
+                            }
                         }
                     }
 
@@ -226,23 +241,27 @@ fun RouteSimulationScreen(
                     val allRoutes = historyRoutes.sortedByDescending { it.id.toLongOrNull() ?: 0L }
 
                     Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
-                        TabRow(
-                            selectedTabIndex = selectedTab,
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Tab(
-                                selected = selectedTab == 0,
-                                onClick = { selectedTab = 0 },
-                                text = { Text(stringResource(R.string.joystick_history_favorites), fontSize = 14.sp) }
-                            )
-                            Tab(
-                                selected = selectedTab == 1,
-                                onClick = { selectedTab = 1 },
-                                text = { Text(stringResource(R.string.route_sim_history), fontSize = 14.sp) }
-                            )
+                        BadgedControl(show = showHelp, number = 6, modifier = Modifier.weight(1f)) {
+                            TabRow(
+                                selectedTabIndex = selectedTab,
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Tab(
+                                    selected = selectedTab == 0,
+                                    onClick = { selectedTab = 0 },
+                                    text = { Text(stringResource(R.string.joystick_history_favorites), fontSize = 14.sp) }
+                                )
+                                Tab(
+                                    selected = selectedTab == 1,
+                                    onClick = { selectedTab = 1 },
+                                    text = { Text(stringResource(R.string.route_sim_history), fontSize = 14.sp) }
+                                )
+                            }
                         }
-                        IconButton(onClick = { isSearchVisible = !isSearchVisible }) {
-                            Icon(Icons.Default.Search, contentDescription = "Search")
+                        BadgedControl(show = showHelp, number = 7) {
+                            IconButton(onClick = { isSearchVisible = !isSearchVisible }) {
+                                Icon(Icons.Default.Search, contentDescription = "Search")
+                            }
                         }
                     }
 
@@ -374,7 +393,8 @@ fun RouteSimulationScreen(
                                             onToggleFavorite = { viewModel.toggleFavorite(route.id) },
                                             onEdit = { onEditRoute(route.id) },
                                             onRename = { renameTarget = route; renameText = route.startName },
-                                            onDelete = { viewModel.deleteRoute(route.id) }
+                                            onDelete = { viewModel.deleteRoute(route.id) },
+                                            showHelp = showHelp
                                         )
                                     }
                                     Spacer(modifier = Modifier.height(8.dp))
@@ -398,13 +418,32 @@ fun RouteSimulationScreen(
                                     onToggleFavorite = { viewModel.toggleFavorite(route.id) },
                                     onEdit = { onEditRoute(route.id) },
                                     onRename = { renameTarget = route; renameText = route.startName },
-                                    onDelete = { viewModel.deleteRoute(route.id) }
+                                    onDelete = { viewModel.deleteRoute(route.id) },
+                                    showHelp = showHelp
                                 )
                             }
                         }
                     }
                 }
             }
+        }
+        HelpOverlayScrim(
+            showHelp = showHelp,
+            entries = listOf(
+                1 to R.string.help_route_sim_menu,
+                2 to R.string.help_route_sim_add_extend,
+                3 to R.string.help_route_sim_start,
+                4 to R.string.help_route_sim_speed,
+                5 to R.string.help_route_sim_loop,
+                6 to R.string.help_route_sim_tabs,
+                7 to R.string.help_route_sim_search,
+                8 to R.string.help_route_sim_card_fav,
+                9 to R.string.help_route_sim_card_edit,
+                10 to R.string.help_route_sim_card_rename,
+                11 to R.string.help_route_sim_card_delete
+            ),
+            onDismiss = { showHelp = false }
+        )
         }
     }
 
@@ -465,6 +504,7 @@ fun RouteCard(
     onStopSimulation: (() -> Unit)? = null,
     isPaused: Boolean = false,
     onPauseResume: (() -> Unit)? = null,
+    showHelp: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     Card(
@@ -537,70 +577,76 @@ fun RouteCard(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    if (isStarting) {
-                        Button(
-                            onClick = {},
-                            enabled = false,
-                            colors = ButtonDefaults.buttonColors(
-                                disabledContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.72f),
-                                disabledContentColor = Color.White
-                            ),
-                            shape = RoundedCornerShape(20.dp),
-                            contentPadding = PaddingValues(horizontal = 24.dp, vertical = 8.dp)
-                        ) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(18.dp),
-                                strokeWidth = 2.dp,
-                                color = Color.White
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(stringResource(R.string.sim_starting), fontSize = 14.sp)
-                        }
-                    } else if (!isSimulating) {
-                        Button(
-                            onClick = { onStartSimulation?.invoke(settings!!) },
-                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
-                            shape = RoundedCornerShape(20.dp),
-                            contentPadding = PaddingValues(horizontal = 24.dp, vertical = 8.dp)
-                        ) { Text(stringResource(R.string.route_sim_start), fontSize = 14.sp) }
-                    } else {
-                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    BadgedControl(show = showHelp, number = 3) {
+                        if (isStarting) {
                             Button(
-                                onClick = { onPauseResume?.invoke() },
+                                onClick = {},
+                                enabled = false,
+                                colors = ButtonDefaults.buttonColors(
+                                    disabledContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.72f),
+                                    disabledContentColor = Color.White
+                                ),
+                                shape = RoundedCornerShape(20.dp),
+                                contentPadding = PaddingValues(horizontal = 24.dp, vertical = 8.dp)
+                            ) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(18.dp),
+                                    strokeWidth = 2.dp,
+                                    color = Color.White
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(stringResource(R.string.sim_starting), fontSize = 14.sp)
+                            }
+                        } else if (!isSimulating) {
+                            Button(
+                                onClick = { onStartSimulation?.invoke(settings!!) },
                                 colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
                                 shape = RoundedCornerShape(20.dp),
                                 contentPadding = PaddingValues(horizontal = 24.dp, vertical = 8.dp)
-                            ) { Text(if (isPaused) stringResource(R.string.route_sim_resume) else stringResource(R.string.route_sim_pause), fontSize = 14.sp) }
-                            Button(
-                                onClick = { onStopSimulation?.invoke() },
-                                colors = ButtonDefaults.buttonColors(containerColor = Color.Red),
-                                shape = RoundedCornerShape(20.dp),
-                                contentPadding = PaddingValues(horizontal = 24.dp, vertical = 8.dp)
-                            ) { Text(stringResource(R.string.route_sim_stop), fontSize = 14.sp) }
+                            ) { Text(stringResource(R.string.route_sim_start), fontSize = 14.sp) }
+                        } else {
+                            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                Button(
+                                    onClick = { onPauseResume?.invoke() },
+                                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+                                    shape = RoundedCornerShape(20.dp),
+                                    contentPadding = PaddingValues(horizontal = 24.dp, vertical = 8.dp)
+                                ) { Text(if (isPaused) stringResource(R.string.route_sim_resume) else stringResource(R.string.route_sim_pause), fontSize = 14.sp) }
+                                Button(
+                                    onClick = { onStopSimulation?.invoke() },
+                                    colors = ButtonDefaults.buttonColors(containerColor = Color.Red),
+                                    shape = RoundedCornerShape(20.dp),
+                                    contentPadding = PaddingValues(horizontal = 24.dp, vertical = 8.dp)
+                                ) { Text(stringResource(R.string.route_sim_stop), fontSize = 14.sp) }
+                            }
                         }
                     }
 
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            text = stringResource(R.string.route_sim_speed_btn),
-                            fontSize = 12.sp,
-                            color = MaterialTheme.colorScheme.primary,
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier
-                                .clickable { onSettingsClick?.invoke() }
-                                .padding(end = 4.dp)
-                        )
-                        Icon(
-                            painter = painterResource(id = R.drawable.ic_bike), // Using existing icon
-                            contentDescription = "Settings",
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier
-                                .size(20.dp)
-                                .clickable { onSettingsClick?.invoke() }
-                        )
-                        
+                        BadgedControl(show = showHelp, number = 4) {
+                            Row {
+                                Text(
+                                    text = stringResource(R.string.route_sim_speed_btn),
+                                    fontSize = 12.sp,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier
+                                        .clickable { onSettingsClick?.invoke() }
+                                        .padding(end = 4.dp)
+                                )
+                                Icon(
+                                    painter = painterResource(id = R.drawable.ic_bike), // Using existing icon
+                                    contentDescription = "Settings",
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier
+                                        .size(20.dp)
+                                        .clickable { onSettingsClick?.invoke() }
+                                )
+                            }
+                        }
+
                         Spacer(modifier = Modifier.width(16.dp))
-                        
+
                         Text(
                             text = stringResource(R.string.route_sim_loop),
                             fontSize = 12.sp,
@@ -608,15 +654,17 @@ fun RouteCard(
                             fontWeight = FontWeight.Bold,
                             modifier = Modifier.padding(end = 4.dp)
                         )
-                        Switch(
-                            checked = settings.isLoop,
-                            onCheckedChange = onLoopToggle,
-                            colors = SwitchDefaults.colors(
-                                checkedThumbColor = Color.White,
-                                checkedTrackColor = MaterialTheme.colorScheme.primary
-                            ),
-                            modifier = Modifier.scale(0.8f)
-                        )
+                        BadgedControl(show = showHelp, number = 5) {
+                            Switch(
+                                checked = settings.isLoop,
+                                onCheckedChange = onLoopToggle,
+                                colors = SwitchDefaults.colors(
+                                    checkedThumbColor = Color.White,
+                                    checkedTrackColor = MaterialTheme.colorScheme.primary
+                                ),
+                                modifier = Modifier.scale(0.8f)
+                            )
+                        }
                     }
                 }
             }
@@ -809,7 +857,8 @@ fun RouteHistoryCard(
     onRename: () -> Unit,
     onDelete: () -> Unit,
     onMoveUp: () -> Unit = {},
-    onMoveDown: () -> Unit = {}
+    onMoveDown: () -> Unit = {},
+    showHelp: Boolean = false
 ) {
     Card(
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
@@ -835,33 +884,41 @@ fun RouteHistoryCard(
                 Text(text = route.endName, fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f))
             }
             Row {
-                IconButton(onClick = onToggleFavorite) {
-                    Icon(
-                        Icons.Default.Star,
-                        contentDescription = "Favorite",
-                        tint = if (isFav) Color(0xFFFFB300) else Color.Gray,
-                        modifier = Modifier.graphicsLayer(alpha = if (isFav) 1f else 0.4f)
-                    )
+                BadgedControl(show = showHelp, number = 8) {
+                    IconButton(onClick = onToggleFavorite) {
+                        Icon(
+                            Icons.Default.Star,
+                            contentDescription = "Favorite",
+                            tint = if (isFav) Color(0xFFFFB300) else Color.Gray,
+                            modifier = Modifier.graphicsLayer(alpha = if (isFav) 1f else 0.4f)
+                        )
+                    }
                 }
-                IconButton(onClick = onEdit) {
-                    Icon(Icons.Default.Place, contentDescription = "Edit Route", tint = MaterialTheme.colorScheme.primary)
+                BadgedControl(show = showHelp, number = 9) {
+                    IconButton(onClick = onEdit) {
+                        Icon(Icons.Default.Place, contentDescription = "Edit Route", tint = MaterialTheme.colorScheme.primary)
+                    }
                 }
-                IconButton(onClick = onRename) {
-                    Icon(Icons.Default.Edit, contentDescription = "Rename", tint = MaterialTheme.colorScheme.primary)
+                BadgedControl(show = showHelp, number = 10) {
+                    IconButton(onClick = onRename) {
+                        Icon(Icons.Default.Edit, contentDescription = "Rename", tint = MaterialTheme.colorScheme.primary)
+                    }
                 }
                 val context = LocalContext.current
                 val prefs = remember { PreferenceManager.getDefaultSharedPreferences(context) }
                 val showDeleteConfirm = remember { mutableStateOf(false) }
                 var dontRemind by remember { mutableStateOf(false) }
-                IconButton(onClick = {
-                    if (System.currentTimeMillis() < prefs.getLong("delete_dont_remind_until", 0L)) {
-                        onDelete()
-                    } else {
-                        showDeleteConfirm.value = true
-                        dontRemind = false
+                BadgedControl(show = showHelp, number = 11) {
+                    IconButton(onClick = {
+                        if (System.currentTimeMillis() < prefs.getLong("delete_dont_remind_until", 0L)) {
+                            onDelete()
+                        } else {
+                            showDeleteConfirm.value = true
+                            dontRemind = false
+                        }
+                    }) {
+                        Icon(Icons.Default.Delete, contentDescription = "Delete", tint = Color.Red)
                     }
-                }) {
-                    Icon(Icons.Default.Delete, contentDescription = "Delete", tint = Color.Red)
                 }
                 if (showDeleteConfirm.value) {
                     AlertDialog(

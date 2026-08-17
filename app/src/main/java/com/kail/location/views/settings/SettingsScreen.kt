@@ -24,6 +24,9 @@ import com.kail.location.R
 import com.kail.location.utils.DataTransferManager
 import com.kail.location.utils.KailLog
 import com.kail.location.viewmodels.SettingsViewModel
+import com.kail.location.views.common.BadgedControl
+import com.kail.location.views.common.HelpActionButton
+import com.kail.location.views.common.HelpOverlayScrim
 
 /**
  * 设置屏幕主界面
@@ -42,6 +45,7 @@ fun SettingsScreen(
     val context = LocalContext.current
     var logCacheSize by remember { mutableStateOf(KailLog.getLogCacheSizeBytes(context)) }
     var showClearLogDialog by remember { mutableStateOf(false) }
+    var showHelp by remember { mutableStateOf(false) }
     val exportLogLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.CreateDocument("text/plain")
     ) { uri ->
@@ -121,23 +125,29 @@ fun SettingsScreen(
     val opencellidApiKey by viewModel.opencellidApiKey.collectAsState()
     val selinuxPermissiveEnabled by viewModel.selinuxPermissiveEnabled.collectAsState()
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text(stringResource(R.string.nav_menu_settings)) },
-                navigationIcon = {
-                    IconButton(onClick = onBackClick) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    titleContentColor = Color.White,
-                    navigationIconContentColor = Color.White
+    Box {
+        Scaffold(
+            topBar = {
+                TopAppBar(
+                    title = { Text(stringResource(R.string.nav_menu_settings)) },
+                    navigationIcon = {
+                        BadgedControl(show = showHelp, number = 1) {
+                            IconButton(onClick = onBackClick) {
+                                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                            }
+                        }
+                    },
+                    actions = {
+                        HelpActionButton(showHelp = showHelp) { showHelp = true }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        titleContentColor = Color.White,
+                        navigationIconContentColor = Color.White
+                    )
                 )
-            )
-        }
-    ) { paddingValues ->
+            }
+        ) { paddingValues ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -147,224 +157,317 @@ fun SettingsScreen(
             // ===== Group: 移动参数 =====
             PreferenceCategory(title = stringResource(R.string.setting_group_move))
 
-            ListPreference(
-                title = stringResource(R.string.setting_joystick_type),
-                currentValue = joystickType,
-                entries = stringArrayResource(R.array.array_joystick_type),
-                entryValues = stringArrayResource(R.array.array_joystick_type_values),
-                onValueChange = { viewModel.updateStringPreference(SettingsViewModel.KEY_JOYSTICK_TYPE, it) }
-            )
+            BadgedControl(show = showHelp, number = 2, modifier = Modifier.fillMaxWidth()) {
+                ListPreference(
+                    title = stringResource(R.string.setting_joystick_type),
+                    currentValue = joystickType,
+                    entries = stringArrayResource(R.array.array_joystick_type),
+                    entryValues = stringArrayResource(R.array.array_joystick_type_values),
+                    onValueChange = { viewModel.updateStringPreference(SettingsViewModel.KEY_JOYSTICK_TYPE, it) }
+                )
+            }
 
-            EditTextPreference(
-                title = stringResource(R.string.setting_walk),
-                value = walkSpeed,
-                onValueChange = { viewModel.updateStringPreference(SettingsViewModel.KEY_WALK_SPEED, it) }
-            )
+            BadgedControl(show = showHelp, number = 3, modifier = Modifier.fillMaxWidth()) {
+                EditTextPreference(
+                    title = stringResource(R.string.setting_walk),
+                    value = walkSpeed,
+                    onValueChange = { viewModel.updateStringPreference(SettingsViewModel.KEY_WALK_SPEED, it) }
+                )
+            }
 
-            EditTextPreference(
-                title = stringResource(R.string.setting_run),
-                value = runSpeed,
-                onValueChange = { viewModel.updateStringPreference(SettingsViewModel.KEY_RUN_SPEED, it) }
-            )
+            BadgedControl(show = showHelp, number = 4, modifier = Modifier.fillMaxWidth()) {
+                EditTextPreference(
+                    title = stringResource(R.string.setting_run),
+                    value = runSpeed,
+                    onValueChange = { viewModel.updateStringPreference(SettingsViewModel.KEY_RUN_SPEED, it) }
+                )
+            }
 
-            EditTextPreference(
-                title = stringResource(R.string.setting_bike),
-                value = bikeSpeed,
-                onValueChange = { viewModel.updateStringPreference(SettingsViewModel.KEY_BIKE_SPEED, it) }
-            )
+            BadgedControl(show = showHelp, number = 5, modifier = Modifier.fillMaxWidth()) {
+                EditTextPreference(
+                    title = stringResource(R.string.setting_bike),
+                    value = bikeSpeed,
+                    onValueChange = { viewModel.updateStringPreference(SettingsViewModel.KEY_BIKE_SPEED, it) }
+                )
+            }
 
             // ===== Group: 位置模拟参数 =====
             PreferenceCategory(title = stringResource(R.string.setting_group_move))
 
-            EditTextPreference(
-                title = stringResource(R.string.setting_altitude),
-                value = altitude,
-                onValueChange = { viewModel.updateStringPreference(SettingsViewModel.KEY_ALTITUDE, it) }
-            )
+            BadgedControl(show = showHelp, number = 6, modifier = Modifier.fillMaxWidth()) {
+                EditTextPreference(
+                    title = stringResource(R.string.setting_altitude),
+                    value = altitude,
+                    onValueChange = { viewModel.updateStringPreference(SettingsViewModel.KEY_ALTITUDE, it) }
+                )
+            }
 
-            EditTextPreference(
-                title = stringResource(R.string.setting_mock_speed),
-                value = mockSpeed,
-                onValueChange = { viewModel.updateStringPreference(SettingsViewModel.KEY_MOCK_SPEED, it) }
-            )
+            BadgedControl(show = showHelp, number = 7, modifier = Modifier.fillMaxWidth()) {
+                EditTextPreference(
+                    title = stringResource(R.string.setting_mock_speed),
+                    value = mockSpeed,
+                    onValueChange = { viewModel.updateStringPreference(SettingsViewModel.KEY_MOCK_SPEED, it) }
+                )
+            }
 
-            EditTextPreference(
-                title = stringResource(R.string.setting_accuracy_title),
-                value = accuracy,
-                onValueChange = { viewModel.updateStringPreference(SettingsViewModel.KEY_ACCURACY, it) },
-                description = stringResource(R.string.setting_accuracy_summary)
-            )
+            BadgedControl(show = showHelp, number = 8, modifier = Modifier.fillMaxWidth()) {
+                EditTextPreference(
+                    title = stringResource(R.string.setting_accuracy_title),
+                    value = accuracy,
+                    onValueChange = { viewModel.updateStringPreference(SettingsViewModel.KEY_ACCURACY, it) },
+                    description = stringResource(R.string.setting_accuracy_summary)
+                )
+            }
 
-            EditTextPreference(
-                title = stringResource(R.string.setting_min_satellites),
-                value = minSatellites,
-                onValueChange = { viewModel.updateStringPreference(SettingsViewModel.KEY_MIN_SATELLITES, it) },
-                description = stringResource(R.string.setting_min_satellites_summary)
-            )
+            BadgedControl(show = showHelp, number = 9, modifier = Modifier.fillMaxWidth()) {
+                EditTextPreference(
+                    title = stringResource(R.string.setting_min_satellites),
+                    value = minSatellites,
+                    onValueChange = { viewModel.updateStringPreference(SettingsViewModel.KEY_MIN_SATELLITES, it) },
+                    description = stringResource(R.string.setting_min_satellites_summary)
+                )
+            }
 
-            EditTextPreference(
-                title = stringResource(R.string.setting_report_interval),
-                value = reportInterval,
-                onValueChange = { viewModel.updateStringPreference(SettingsViewModel.KEY_REPORT_INTERVAL, it) },
-                description = stringResource(R.string.setting_report_interval_summary)
-            )
+            BadgedControl(show = showHelp, number = 10, modifier = Modifier.fillMaxWidth()) {
+                EditTextPreference(
+                    title = stringResource(R.string.setting_report_interval),
+                    value = reportInterval,
+                    onValueChange = { viewModel.updateStringPreference(SettingsViewModel.KEY_REPORT_INTERVAL, it) },
+                    description = stringResource(R.string.setting_report_interval_summary)
+                )
+            }
 
             // ===== Group: 位置偏移 =====
             PreferenceCategory(title = stringResource(R.string.setting_group_location_offset))
 
-            SwitchPreference(
-                title = stringResource(R.string.setting_random_offset),
-                checked = randomOffset,
-                onCheckedChange = { viewModel.updateBooleanPreference(SettingsViewModel.KEY_RANDOM_OFFSET, it) },
-                summary = stringResource(R.string.setting_random_offset_summary)
-            )
+            BadgedControl(show = showHelp, number = 11, modifier = Modifier.fillMaxWidth()) {
+                SwitchPreference(
+                    title = stringResource(R.string.setting_random_offset),
+                    checked = randomOffset,
+                    onCheckedChange = { viewModel.updateBooleanPreference(SettingsViewModel.KEY_RANDOM_OFFSET, it) },
+                    summary = stringResource(R.string.setting_random_offset_summary)
+                )
+            }
 
-            EditTextPreference(
-                title = stringResource(R.string.setting_lat_max_offset),
-                value = latOffset,
-                onValueChange = { viewModel.updateStringPreference(SettingsViewModel.KEY_LAT_OFFSET, it) }
-            )
+            BadgedControl(show = showHelp, number = 12, modifier = Modifier.fillMaxWidth()) {
+                EditTextPreference(
+                    title = stringResource(R.string.setting_lat_max_offset),
+                    value = latOffset,
+                    onValueChange = { viewModel.updateStringPreference(SettingsViewModel.KEY_LAT_OFFSET, it) }
+                )
+            }
 
-            EditTextPreference(
-                title = stringResource(R.string.setting_lon_max_offset),
-                value = lonOffset,
-                onValueChange = { viewModel.updateStringPreference(SettingsViewModel.KEY_LON_OFFSET, it) }
-            )
+            BadgedControl(show = showHelp, number = 13, modifier = Modifier.fillMaxWidth()) {
+                EditTextPreference(
+                    title = stringResource(R.string.setting_lon_max_offset),
+                    value = lonOffset,
+                    onValueChange = { viewModel.updateStringPreference(SettingsViewModel.KEY_LON_OFFSET, it) }
+                )
+            }
 
             // ===== Group: 卫星与信号 =====
             PreferenceCategory(title = stringResource(R.string.setting_group_satellite_and_signal))
 
-            SwitchPreference(
-                title = stringResource(R.string.setting_gps_satellite_title),
-                checked = gpsSatelliteSim,
-                onCheckedChange = { viewModel.updateBooleanPreference(SettingsViewModel.KEY_GPS_SATELLITE_SIM, it) },
-                summary = stringResource(R.string.setting_gps_satellite_summary)
-            )
+            BadgedControl(show = showHelp, number = 14, modifier = Modifier.fillMaxWidth()) {
+                SwitchPreference(
+                    title = stringResource(R.string.setting_gps_satellite_title),
+                    checked = gpsSatelliteSim,
+                    onCheckedChange = { viewModel.updateBooleanPreference(SettingsViewModel.KEY_GPS_SATELLITE_SIM, it) },
+                    summary = stringResource(R.string.setting_gps_satellite_summary)
+                )
+            }
 
             // ===== Group: 步频模拟 =====
             PreferenceCategory(title = stringResource(R.string.settings_step_sim))
 
-            SwitchPreference(
-                title = stringResource(R.string.settings_step_sim_enable),
-                checked = stepSimEnabled,
-                onCheckedChange = { viewModel.updateBooleanPreference(SettingsViewModel.KEY_STEP_SIM_ENABLED, it) },
-                summary = stringResource(R.string.settings_step_sim_summary)
-            )
+            BadgedControl(show = showHelp, number = 15, modifier = Modifier.fillMaxWidth()) {
+                SwitchPreference(
+                    title = stringResource(R.string.settings_step_sim_enable),
+                    checked = stepSimEnabled,
+                    onCheckedChange = { viewModel.updateBooleanPreference(SettingsViewModel.KEY_STEP_SIM_ENABLED, it) },
+                    summary = stringResource(R.string.settings_step_sim_summary)
+                )
+            }
 
-            ListPreference(
-                title = stringResource(R.string.settings_step_type),
-                currentValue = simScheme,
-                entries = stringArrayResource(R.array.array_sim_scheme),
-                entryValues = stringArrayResource(R.array.array_sim_scheme_values),
-                onValueChange = { viewModel.updateStringPreference(SettingsViewModel.KEY_SIM_SCHEME, it) }
-            )
+            BadgedControl(show = showHelp, number = 16, modifier = Modifier.fillMaxWidth()) {
+                ListPreference(
+                    title = stringResource(R.string.settings_step_type),
+                    currentValue = simScheme,
+                    entries = stringArrayResource(R.array.array_sim_scheme),
+                    entryValues = stringArrayResource(R.array.array_sim_scheme_values),
+                    onValueChange = { viewModel.updateStringPreference(SettingsViewModel.KEY_SIM_SCHEME, it) }
+                )
+            }
 
-            SwitchPreference(
-                title = stringResource(R.string.setting_natural_jitter),
-                checked = naturalJitter,
-                onCheckedChange = { viewModel.updateBooleanPreference(SettingsViewModel.KEY_NATURAL_JITTER, it) },
-                summary = stringResource(R.string.setting_natural_jitter_summary)
-            )
+            BadgedControl(show = showHelp, number = 17, modifier = Modifier.fillMaxWidth()) {
+                SwitchPreference(
+                    title = stringResource(R.string.setting_natural_jitter),
+                    checked = naturalJitter,
+                    onCheckedChange = { viewModel.updateBooleanPreference(SettingsViewModel.KEY_NATURAL_JITTER, it) },
+                    summary = stringResource(R.string.setting_natural_jitter_summary)
+                )
+            }
 
             // ===== Group: 日志 =====
             PreferenceCategory(title = stringResource(R.string.setting_group_log))
 
-            SwitchPreference(
-                title = stringResource(R.string.setting_enable_log),
-                checked = logEnabled,
-                onCheckedChange = { viewModel.updateBooleanPreference(SettingsViewModel.KEY_LOG_ENABLED, it) },
-                summary = stringResource(R.string.setting_enable_log_summary)
-            )
+            BadgedControl(show = showHelp, number = 18, modifier = Modifier.fillMaxWidth()) {
+                SwitchPreference(
+                    title = stringResource(R.string.setting_enable_log),
+                    checked = logEnabled,
+                    onCheckedChange = { viewModel.updateBooleanPreference(SettingsViewModel.KEY_LOG_ENABLED, it) },
+                    summary = stringResource(R.string.setting_enable_log_summary)
+                )
+            }
 
-            SwitchPreference(
-                title = stringResource(R.string.setting_enable_debug_log),
-                checked = debugLogEnabled,
-                onCheckedChange = { viewModel.updateBooleanPreference(SettingsViewModel.KEY_DEBUG_LOG_ENABLED, it) },
-                summary = stringResource(R.string.setting_enable_debug_log_summary)
-            )
+            BadgedControl(show = showHelp, number = 19, modifier = Modifier.fillMaxWidth()) {
+                SwitchPreference(
+                    title = stringResource(R.string.setting_enable_debug_log),
+                    checked = debugLogEnabled,
+                    onCheckedChange = { viewModel.updateBooleanPreference(SettingsViewModel.KEY_DEBUG_LOG_ENABLED, it) },
+                    summary = stringResource(R.string.setting_enable_debug_log_summary)
+                )
+            }
 
-            ActionPreference(
-                title = stringResource(R.string.setting_export_log),
-                summary = stringResource(R.string.setting_export_log_summary),
-                onClick = { exportLogLauncher.launch("kail_location_logs.txt") }
-            )
+            BadgedControl(show = showHelp, number = 20, modifier = Modifier.fillMaxWidth()) {
+                ActionPreference(
+                    title = stringResource(R.string.setting_export_log),
+                    summary = stringResource(R.string.setting_export_log_summary),
+                    onClick = { exportLogLauncher.launch("kail_location_logs.txt") }
+                )
+            }
 
-            ActionPreference(
-                title = stringResource(R.string.setting_clear_log_cache),
-                summary = stringResource(R.string.setting_clear_log_cache_summary, formatBytes(logCacheSize)),
-                onClick = {
-                    logCacheSize = KailLog.getLogCacheSizeBytes(context)
-                    showClearLogDialog = true
-                }
-            )
+            BadgedControl(show = showHelp, number = 21, modifier = Modifier.fillMaxWidth()) {
+                ActionPreference(
+                    title = stringResource(R.string.setting_clear_log_cache),
+                    summary = stringResource(R.string.setting_clear_log_cache_summary, formatBytes(logCacheSize)),
+                    onClick = {
+                        logCacheSize = KailLog.getLogCacheSizeBytes(context)
+                        showClearLogDialog = true
+                    }
+                )
+            }
 
             // ===== Group: 其他 =====
             PreferenceCategory(title = stringResource(R.string.setting_group_other))
 
-            SwitchPreference(
-                title = stringResource(R.string.setting_selinux_permissive),
-                checked = selinuxPermissiveEnabled,
-                onCheckedChange = { viewModel.updateBooleanPreference(SettingsViewModel.KEY_SELINUX_PERMISSIVE, it) },
-                summary = stringResource(R.string.setting_selinux_permissive_summary)
-            )
+            BadgedControl(show = showHelp, number = 22, modifier = Modifier.fillMaxWidth()) {
+                SwitchPreference(
+                    title = stringResource(R.string.setting_selinux_permissive),
+                    checked = selinuxPermissiveEnabled,
+                    onCheckedChange = { viewModel.updateBooleanPreference(SettingsViewModel.KEY_SELINUX_PERMISSIVE, it) },
+                    summary = stringResource(R.string.setting_selinux_permissive_summary)
+                )
+            }
 
-            EditTextPreference(
-                title = stringResource(R.string.setting_baidu_key),
-                value = baiduMapKey,
-                onValueChange = { viewModel.updateStringPreference(SettingsViewModel.KEY_BAIDU_MAP_KEY, it) }
-            )
+            BadgedControl(show = showHelp, number = 23, modifier = Modifier.fillMaxWidth()) {
+                EditTextPreference(
+                    title = stringResource(R.string.setting_baidu_key),
+                    value = baiduMapKey,
+                    onValueChange = { viewModel.updateStringPreference(SettingsViewModel.KEY_BAIDU_MAP_KEY, it) }
+                )
+            }
 
-            EditTextPreference(
-                title = stringResource(R.string.setting_opencellid_key),
-                value = opencellidApiKey,
-                onValueChange = { viewModel.updateStringPreference(SettingsViewModel.KEY_OPENCELLID_API_KEY, it) },
-                description = stringResource(R.string.setting_opencellid_key_summary)
-            )
+            BadgedControl(show = showHelp, number = 24, modifier = Modifier.fillMaxWidth()) {
+                EditTextPreference(
+                    title = stringResource(R.string.setting_opencellid_key),
+                    value = opencellidApiKey,
+                    onValueChange = { viewModel.updateStringPreference(SettingsViewModel.KEY_OPENCELLID_API_KEY, it) },
+                    description = stringResource(R.string.setting_opencellid_key_summary)
+                )
+            }
 
-            EditTextPreference(
-                title = stringResource(R.string.setting_history_expiration),
-                value = historyExpiration,
-                onValueChange = { viewModel.updateStringPreference(SettingsViewModel.KEY_HISTORY_EXPIRATION, it) }
-            )
+            BadgedControl(show = showHelp, number = 25, modifier = Modifier.fillMaxWidth()) {
+                EditTextPreference(
+                    title = stringResource(R.string.setting_history_expiration),
+                    value = historyExpiration,
+                    onValueChange = { viewModel.updateStringPreference(SettingsViewModel.KEY_HISTORY_EXPIRATION, it) }
+                )
+            }
 
             // ===== Group: 数据备份 =====
             PreferenceCategory(title = stringResource(R.string.setting_group_data_transfer))
 
-            ActionPreference(
-                title = stringResource(R.string.setting_export_data),
-                summary = stringResource(R.string.setting_export_data_summary),
-                onClick = { showExportDialog = true }
-            )
+            BadgedControl(show = showHelp, number = 26, modifier = Modifier.fillMaxWidth()) {
+                ActionPreference(
+                    title = stringResource(R.string.setting_export_data),
+                    summary = stringResource(R.string.setting_export_data_summary),
+                    onClick = { showExportDialog = true }
+                )
+            }
 
-            ActionPreference(
-                title = stringResource(R.string.setting_import_data),
-                summary = stringResource(R.string.setting_import_data_summary),
-                onClick = { pickBackupLauncher.launch(arrayOf("*/*")) }
-            )
+            BadgedControl(show = showHelp, number = 27, modifier = Modifier.fillMaxWidth()) {
+                ActionPreference(
+                    title = stringResource(R.string.setting_import_data),
+                    summary = stringResource(R.string.setting_import_data_summary),
+                    onClick = { pickBackupLauncher.launch(arrayOf("*/*")) }
+                )
+            }
 
             // ===== Group: 个性化 =====
             PreferenceCategory(title = stringResource(R.string.setting_group_personalization))
 
-            SizePreference(
-                title = stringResource(R.string.setting_floating_window_size),
-                width = viewModel.floatingWindowWidth.collectAsState().value,
-                height = viewModel.floatingWindowHeight.collectAsState().value,
-                onWidthChange = { viewModel.updateStringPreference(SettingsViewModel.KEY_FLOATING_WINDOW_WIDTH, it) },
-                onHeightChange = { viewModel.updateStringPreference(SettingsViewModel.KEY_FLOATING_WINDOW_HEIGHT, it) }
-            )
+            BadgedControl(show = showHelp, number = 28, modifier = Modifier.fillMaxWidth()) {
+                SizePreference(
+                    title = stringResource(R.string.setting_floating_window_size),
+                    width = viewModel.floatingWindowWidth.collectAsState().value,
+                    height = viewModel.floatingWindowHeight.collectAsState().value,
+                    onWidthChange = { viewModel.updateStringPreference(SettingsViewModel.KEY_FLOATING_WINDOW_WIDTH, it) },
+                    onHeightChange = { viewModel.updateStringPreference(SettingsViewModel.KEY_FLOATING_WINDOW_HEIGHT, it) }
+                )
+            }
 
-            EditTextPreference(
-                title = stringResource(R.string.setting_map_zoom),
-                value = viewModel.mapZoom.collectAsState().value,
-                onValueChange = { viewModel.updateStringPreference(SettingsViewModel.KEY_MAP_ZOOM, it) },
-                description = stringResource(R.string.setting_map_zoom_summary)
-            )
+            BadgedControl(show = showHelp, number = 29, modifier = Modifier.fillMaxWidth()) {
+                EditTextPreference(
+                    title = stringResource(R.string.setting_map_zoom),
+                    value = viewModel.mapZoom.collectAsState().value,
+                    onValueChange = { viewModel.updateStringPreference(SettingsViewModel.KEY_MAP_ZOOM, it) },
+                    description = stringResource(R.string.setting_map_zoom_summary)
+                )
+            }
 
             ListItem(
                 headlineContent = { Text(stringResource(R.string.setting_current_version)) },
                 supportingContent = { Text(viewModel.appVersion) }
             )
         }
+    }
+
+        HelpOverlayScrim(
+            showHelp = showHelp,
+            entries = listOf(
+                1 to R.string.help_settings_back,
+                2 to R.string.help_settings_joystick,
+                3 to R.string.help_settings_walk,
+                4 to R.string.help_settings_run,
+                5 to R.string.help_settings_bike,
+                6 to R.string.help_settings_altitude,
+                7 to R.string.help_settings_mock_speed,
+                8 to R.string.help_settings_accuracy,
+                9 to R.string.help_settings_min_satellites,
+                10 to R.string.help_settings_report_interval,
+                11 to R.string.help_settings_random_offset,
+                12 to R.string.help_settings_lat_offset,
+                13 to R.string.help_settings_lon_offset,
+                14 to R.string.help_settings_gps_satellite,
+                15 to R.string.help_settings_step_sim,
+                16 to R.string.help_settings_step_type,
+                17 to R.string.help_settings_natural_jitter,
+                18 to R.string.help_settings_enable_log,
+                19 to R.string.help_settings_debug_log,
+                20 to R.string.help_settings_export_log,
+                21 to R.string.help_settings_clear_log,
+                22 to R.string.help_settings_selinux,
+                23 to R.string.help_settings_baidu_key,
+                24 to R.string.help_settings_opencellid_key,
+                25 to R.string.help_settings_history_expiration,
+                26 to R.string.help_settings_export_data,
+                27 to R.string.help_settings_import_data,
+                28 to R.string.help_settings_window_size,
+                29 to R.string.help_settings_map_zoom
+            ),
+            onDismiss = { showHelp = false }
+        )
     }
 
     if (showExportDialog) {

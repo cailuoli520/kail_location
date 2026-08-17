@@ -9,6 +9,7 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -44,6 +45,9 @@ import com.kail.location.sandbox.SandboxManager
 import com.kail.location.sandbox.SandboxSettingsManager
 import com.kail.location.viewmodels.SandboxViewModel
 import com.kail.location.views.common.AppDrawer
+import com.kail.location.views.common.BadgedControl
+import com.kail.location.views.common.HelpActionButton
+import com.kail.location.views.common.HelpOverlayScrim
 import kotlinx.coroutines.launch
 
 /**
@@ -79,6 +83,7 @@ fun SandboxScreen(
     var showInstallDialog by remember { mutableStateOf(false) }
     var showSettings by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
+    var showHelp by remember { mutableStateOf(false) }
 
     toastMessage?.let { msg ->
         LaunchedEffect(msg) {
@@ -103,124 +108,152 @@ fun SandboxScreen(
             )
         }
     ) {
-        Scaffold(
-            topBar = {
-                TopAppBar(
-                    title = { Text(stringResource(R.string.drawer_sandbox)) },
-                    navigationIcon = {
-                        IconButton(onClick = { scope.launch { drawerState.open() } }) {
-                            Icon(
-                                Icons.Default.Menu,
-                                contentDescription = "Menu",
-                                tint = Color.White
-                            )
-                        }
-                    },
-                    actions = {
-                        IconButton(onClick = { showSettings = true }) {
-                            Icon(
-                                Icons.Default.Settings,
-                                contentDescription = "Settings",
-                                tint = Color.White
-                            )
-                        }
-                        IconButton(onClick = { showInstallDialog = true }) {
-                            Icon(
-                                Icons.Default.Add,
-                                contentDescription = "Install",
-                                tint = Color.White
-                            )
-                        }
-                    },
-                    colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = MaterialTheme.colorScheme.primary,
-                        titleContentColor = Color.White,
-                        navigationIconContentColor = Color.White,
-                        actionIconContentColor = Color.White
+        Box {
+            Scaffold(
+                topBar = {
+                    TopAppBar(
+                        title = { Text(stringResource(R.string.drawer_sandbox)) },
+                        navigationIcon = {
+                            BadgedControl(show = showHelp, number = 1) {
+                                IconButton(onClick = { scope.launch { drawerState.open() } }) {
+                                    Icon(
+                                        Icons.Default.Menu,
+                                        contentDescription = "Menu",
+                                        tint = Color.White
+                                    )
+                                }
+                            }
+                        },
+                        actions = {
+                            HelpActionButton(showHelp = showHelp) { showHelp = true }
+                            BadgedControl(show = showHelp, number = 2) {
+                                IconButton(onClick = { showSettings = true }) {
+                                    Icon(
+                                        Icons.Default.Settings,
+                                        contentDescription = "Settings",
+                                        tint = Color.White
+                                    )
+                                }
+                            }
+                            BadgedControl(show = showHelp, number = 3) {
+                                IconButton(onClick = { showInstallDialog = true }) {
+                                    Icon(
+                                        Icons.Default.Add,
+                                        contentDescription = "Install",
+                                        tint = Color.White
+                                    )
+                                }
+                            }
+                        },
+                        colors = TopAppBarDefaults.topAppBarColors(
+                            containerColor = MaterialTheme.colorScheme.primary,
+                            titleContentColor = Color.White,
+                            navigationIconContentColor = Color.White,
+                            actionIconContentColor = Color.White
+                        )
                     )
-                )
-            },
-            floatingActionButton = {
-                FloatingActionButton(
-                    onClick = { showInstallDialog = true },
-                    containerColor = MaterialTheme.colorScheme.secondary,
-                    shape = CircleShape
-                ) {
-                    Icon(Icons.Default.Add, contentDescription = "Add", tint = Color.White)
-                }
-            }
-        ) { paddingValues ->
-            Column(
-                modifier = Modifier
-                    .padding(paddingValues)
-                    .fillMaxSize()
-            ) {
-                if (isLoading && sandboxApps.isEmpty()) {
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
-                    }
-                } else if (sandboxApps.isEmpty()) {
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Icon(
-                                painter = painterResource(R.drawable.ic_menu_dev),
-                                contentDescription = null,
-                                modifier = Modifier.size(64.dp),
-                                tint = Color.LightGray
-                            )
-                            Spacer(modifier = Modifier.height(16.dp))
-                            Text(
-                                text = stringResource(R.string.sandbox_empty),
-                                color = Color.Gray,
-                                style = MaterialTheme.typography.bodyMedium
-                            )
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Text(
-                                text = stringResource(R.string.sandbox_empty_hint),
-                                color = Color.Gray,
-                                style = MaterialTheme.typography.bodySmall
-                            )
-                        }
-                    }
-                } else {
-                    LazyVerticalGrid(
-                        columns = GridCells.Fixed(2),
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(horizontal = 12.dp),
-                        contentPadding = PaddingValues(vertical = 12.dp),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        verticalArrangement = Arrangement.spacedBy(16.dp)
-                    ) {
-                        items(sandboxApps) { app ->
-                            SandboxAppItem(
-                                app = app,
-                                onClick = { onLaunchApp(app.packageName) },
-                                onLongClick = { showAppMenu = app },
-                                onCreateShortcut = { onCreateShortcut(app.packageName, app.name, app.icon) },
-                                onClearData = { onClearAppData(app.packageName) },
-                                onDeleteApp = { onUninstallApp(app.packageName) }
-                            )
+                },
+                floatingActionButton = {
+                    BadgedControl(show = showHelp, number = 4) {
+                        FloatingActionButton(
+                            onClick = { showInstallDialog = true },
+                            containerColor = MaterialTheme.colorScheme.secondary,
+                            shape = CircleShape
+                        ) {
+                            Icon(Icons.Default.Add, contentDescription = "Add", tint = Color.White)
                         }
                     }
                 }
-
-                Text(
-                    text = stringResource(R.string.app_statement),
+            ) { paddingValues ->
+                Column(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = Color.Gray,
-                    textAlign = TextAlign.Center
-                )
+                        .padding(paddingValues)
+                        .fillMaxSize()
+                ) {
+                    if (isLoading && sandboxApps.isEmpty()) {
+                        Box(
+                            modifier = Modifier.fillMaxSize(),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
+                        }
+                    } else if (sandboxApps.isEmpty()) {
+                        Box(
+                            modifier = Modifier.fillMaxSize(),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Icon(
+                                    painter = painterResource(R.drawable.ic_menu_dev),
+                                    contentDescription = null,
+                                    modifier = Modifier.size(64.dp),
+                                    tint = Color.LightGray
+                                )
+                                Spacer(modifier = Modifier.height(16.dp))
+                                Text(
+                                    text = stringResource(R.string.sandbox_empty),
+                                    color = Color.Gray,
+                                    style = MaterialTheme.typography.bodyMedium
+                                )
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Text(
+                                    text = stringResource(R.string.sandbox_empty_hint),
+                                    color = Color.Gray,
+                                    style = MaterialTheme.typography.bodySmall
+                                )
+                            }
+                        }
+                    } else {
+                        LazyVerticalGrid(
+                            columns = GridCells.Fixed(2),
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(horizontal = 12.dp),
+                            contentPadding = PaddingValues(vertical = 12.dp),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            verticalArrangement = Arrangement.spacedBy(16.dp)
+                        ) {
+                            itemsIndexed(sandboxApps) { index, app ->
+                                SandboxAppItem(
+                                    app = app,
+                                    onClick = { onLaunchApp(app.packageName) },
+                                    onLongClick = { showAppMenu = app },
+                                    onCreateShortcut = { onCreateShortcut(app.packageName, app.name, app.icon) },
+                                    onClearData = { onClearAppData(app.packageName) },
+                                    onDeleteApp = { onUninstallApp(app.packageName) },
+                                    showHelp = showHelp && index == 0,
+                                    badgeBase = 5
+                                )
+                            }
+                        }
+                    }
+
+                    Text(
+                        text = stringResource(R.string.app_statement),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Color.Gray,
+                        textAlign = TextAlign.Center
+                    )
+                }
             }
+
+            HelpOverlayScrim(
+                showHelp = showHelp,
+                entries = listOf(
+                    1 to R.string.help_sandbox_menu,
+                    2 to R.string.help_sandbox_settings,
+                    3 to R.string.help_sandbox_install,
+                    4 to R.string.help_sandbox_fab,
+                    5 to R.string.help_sandbox_app_launch,
+                    6 to R.string.help_sandbox_create_shortcut,
+                    7 to R.string.help_sandbox_clear_data,
+                    8 to R.string.help_sandbox_uninstall
+                ),
+                onDismiss = { showHelp = false }
+            )
         }
     }
 
@@ -335,74 +368,84 @@ fun SandboxAppItem(
     onLongClick: () -> Unit,
     onCreateShortcut: () -> Unit,
     onClearData: () -> Unit,
-    onDeleteApp: () -> Unit
+    onDeleteApp: () -> Unit,
+    showHelp: Boolean = false,
+    badgeBase: Int = 0
 ) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick),
-        shape = RoundedCornerShape(12.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-    ) {
-        Column(
+    BadgedControl(show = showHelp, number = badgeBase, modifier = Modifier.fillMaxWidth()) {
+        Card(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(12.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
+                .clickable(onClick = onClick),
+            shape = RoundedCornerShape(12.dp),
+            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
         ) {
-            AppIcon(icon = app.icon, modifier = Modifier.size(72.dp))
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                text = app.name,
-                fontSize = 14.sp,
-                fontWeight = FontWeight.Medium,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.fillMaxWidth()
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-            OutlinedButton(
-                onClick = onCreateShortcut,
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(8.dp)
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(12.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Icon(
-                    Icons.Default.Share,
-                    contentDescription = null,
-                    modifier = Modifier.size(16.dp)
+                AppIcon(icon = app.icon, modifier = Modifier.size(72.dp))
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = app.name,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Medium,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth()
                 )
-                Spacer(modifier = Modifier.width(4.dp))
-                Text(stringResource(R.string.sandbox_create_shortcut), fontSize = 12.sp)
-            }
-            Spacer(modifier = Modifier.height(4.dp))
-            OutlinedButton(
-                onClick = onClearData,
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(8.dp)
-            ) {
-                Icon(
-                    Icons.Default.Clear,
-                    contentDescription = null,
-                    modifier = Modifier.size(16.dp)
-                )
-                Spacer(modifier = Modifier.width(4.dp))
-                Text(stringResource(R.string.sandbox_clear_data_btn), fontSize = 12.sp)
-            }
-            Spacer(modifier = Modifier.height(4.dp))
-            OutlinedButton(
-                onClick = onDeleteApp,
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(8.dp)
-            ) {
-                Icon(
-                    Icons.Default.Delete,
-                    contentDescription = null,
-                    modifier = Modifier.size(16.dp),
-                    tint = Color.Red
-                )
-                Spacer(modifier = Modifier.width(4.dp))
-                Text(stringResource(R.string.sandbox_uninstall_btn), fontSize = 12.sp, color = Color.Red)
+                Spacer(modifier = Modifier.height(8.dp))
+                BadgedControl(show = showHelp, number = badgeBase + 1, modifier = Modifier.fillMaxWidth()) {
+                    OutlinedButton(
+                        onClick = onCreateShortcut,
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.Share,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(stringResource(R.string.sandbox_create_shortcut), fontSize = 12.sp)
+                    }
+                }
+                Spacer(modifier = Modifier.height(4.dp))
+                BadgedControl(show = showHelp, number = badgeBase + 2, modifier = Modifier.fillMaxWidth()) {
+                    OutlinedButton(
+                        onClick = onClearData,
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.Clear,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(stringResource(R.string.sandbox_clear_data_btn), fontSize = 12.sp)
+                    }
+                }
+                Spacer(modifier = Modifier.height(4.dp))
+                BadgedControl(show = showHelp, number = badgeBase + 3, modifier = Modifier.fillMaxWidth()) {
+                    OutlinedButton(
+                        onClick = onDeleteApp,
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.Delete,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp),
+                            tint = Color.Red
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(stringResource(R.string.sandbox_uninstall_btn), fontSize = 12.sp, color = Color.Red)
+                    }
+                }
             }
         }
     }

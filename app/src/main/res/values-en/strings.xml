@@ -703,6 +703,31 @@
     <string name="loc_sim_joystick">Joystick</string>
     <string name="loc_sim_history_title">History</string>
     <string name="loc_sim_add_tips">Tap "+" in the top right to add</string>
+    <string name="loc_sim_help">Help</string>
+    <string name="help_close_hint">Tap anywhere to close</string>
+    <string name="help_legend_title">Button Guide</string>
+    <string name="help_menu">Open the menu to jump to other modules</string>
+    <string name="help_add_location">Add / change the simulated location</string>
+    <string name="help_header">Tap this area to collapse / expand the card</string>
+    <string name="help_start">Start / stop location simulation</string>
+    <string name="help_collapse">Collapse / expand the card</string>
+    <string name="help_joystick">Joystick toggle; shows the floating joystick when enabled</string>
+    <string name="help_settings">Speed / step-frequency settings (step simulation)</string>
+    <string name="help_tabs">Switch between Favorites / History list</string>
+    <string name="help_search">Search history records</string>
+    <string name="help_card_fav">Favorite / unfavorite this location</string>
+    <string name="help_card_rename">Rename this location</string>
+    <string name="help_card_delete">Delete this location</string>
+    <string name="help_picker_menu">Open the menu to jump to other modules</string>
+    <string name="help_picker_back">Go back</string>
+    <string name="help_picker_search">Search for a place</string>
+    <string name="help_picker_fab">Start / stop location simulation</string>
+    <string name="help_picker_fab_confirm">Confirm this location</string>
+    <string name="help_picker_map_type">Switch map type (normal / satellite)</string>
+    <string name="help_picker_input">Locate by entering coordinates</string>
+    <string name="help_picker_locate">Go to your current location</string>
+    <string name="help_picker_zoom_in">Zoom in</string>
+    <string name="help_picker_zoom_out">Zoom out</string>
 
     <!-- Root & App Hide -->
     <string name="root_hide_title">Root &amp; App Hiding</string>
