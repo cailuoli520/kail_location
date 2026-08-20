@@ -14,10 +14,18 @@ public class PackageAntiDetectionConfig {
     private static List<String> scopedPackageRules;
 
     public static List<String> getTargetPackages() {
+        List<String> fileTargets = AntiDetectConfigFile.getTargetPackages();
+        if (fileTargets != null) {
+            return fileTargets;
+        }
         return targetPackages;
     }
 
     public static List<String> getDetectedPackages() {
+        List<String> fileDetected = AntiDetectConfigFile.getDetectedPackages();
+        if (fileDetected != null) {
+            return fileDetected;
+        }
         return detectedPackages;
     }
 
@@ -58,11 +66,15 @@ public class PackageAntiDetectionConfig {
     }
 
     public static boolean isPackageManagerHookEnabled() {
-        return packageManagerHookEnabled;
+        // Enforcing 下 binder 可能推不进，退到文件通道。
+        return packageManagerHookEnabled || AntiDetectConfigFile.isHookEnabled();
     }
 
     public static boolean isPackageVisibilityFilteringEnabled() {
-        return packageFilterEnabled && packageVisibilityFilterEnabled;
+        if (packageFilterEnabled && packageVisibilityFilterEnabled) {
+            return true;
+        }
+        return AntiDetectConfigFile.isFilterEnabled() && AntiDetectConfigFile.isVisibilityFilterEnabled();
     }
 
     public static boolean isDetectedPackage(String packageName) {
@@ -70,16 +82,16 @@ public class PackageAntiDetectionConfig {
             return false;
         }
         synchronized (configLock) {
-            List<String> list = detectedPackages;
+            List<String> list = getDetectedPackages();
             if (list != null && !list.isEmpty()) {
-                return detectedPackages.contains(packageName);
+                return list.contains(packageName);
             }
             return false;
         }
     }
 
     public static boolean isPackageFilterEnabled() {
-        return packageFilterEnabled;
+        return packageFilterEnabled || AntiDetectConfigFile.isFilterEnabled();
     }
 
     public static void setTargetPackages(List<String> list) {

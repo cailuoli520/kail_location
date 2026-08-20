@@ -20,20 +20,28 @@ using namespace fakeloc;
 
 static bool gAppHookLoaded = false;     // byte_5D48 / byte_74A8
 
+// doRun 返回码，与 libfakeloc_init.cpp 对齐：0x4b4c1000 成功 / 0x4b4c1001 已加载。
+static constexpr uint64_t kRunSuccess = 0x4b4c1000;
+static constexpr uint64_t kRunAlreadyLoaded = 0x4b4c1001;
+static constexpr uint64_t kRunNullVmPtr = 0x4b4c3001;
+static constexpr uint64_t kRunNullVm = 0x4b4c3002;
+static constexpr uint64_t kRunAttachFailed = 0x4b4c3003;
+static constexpr uint64_t kRunInitFailed = 0x4b4c3004;
+
 // ---------------------------------------------------------------------------
 // init  (sub_2030 / sub_289C)
 // ---------------------------------------------------------------------------
-static void init(JNIEnv *env) {
+static bool init(JNIEnv *env) {
   KLOGI(kLogTag, "AppHook is Executing");
 
   if (verifyApkMd5() != 0)
-    return;
+    return false;
   if (!env) {
     KLOGI(kLogTag, "jni_env is NULL!!");
-    return;
+    return false;
   }
   if (verifyReleaseSignature(env) != 0)
-    return;
+    return false;
 
   jobject context = getGlobalContext(env);
 
@@ -79,32 +87,47 @@ static void init(JNIEnv *env) {
   env->DeleteLocalRef(dclClass);
   env->DeleteLocalRef(parentLoader);
   env->DeleteLocalRef(injectClassName);
+  return true;
 }
 
 // ---------------------------------------------------------------------------
 // doRun  (sub_23D4 / sub_2EA0) -- exported entry point used by the injector.
+//
+// 返回 0x4b4c1000 表示成功，与 libfakeloc_init（system_server 载荷）对齐：
+// 否则注入器会把这个返回值（原来 doRun 是 void，x0 里是随机值）误判为失败，
+// 打印 "Inject fail"，即使 hook 实际已装上。
 // ---------------------------------------------------------------------------
-extern "C" __attribute__((visibility("default"))) void doRun(JavaVM **vmPtr, const char *arg) {
+extern "C" __attribute__((visibility("default"))) uint64_t doRun(JavaVM **vmPtr, const char *arg) {
   (void)arg;
   if (gAppHookLoaded) {
     KLOGE(kLogTag, "-- Already loaded");
-    return;
+    return kRunAlreadyLoaded;
   }
+  gAppHookLoaded = true;
+
   if (!vmPtr) {
     KLOGE(kLogTag, "JavaVM** == NULL");
-    return;
+    gAppHookLoaded = false;
+    return kRunNullVmPtr;
   }
   JavaVM *vm = *vmPtr;
   if (!vm) {
     KLOGE(kLogTag, "JavaVM* == NULL");
-    return;
+    gAppHookLoaded = false;
+    return kRunNullVm;
   }
 
   JNIEnv *env = nullptr;
-  if (vm->AttachCurrentThread(&env, nullptr) != JNI_OK)
+  if (vm->AttachCurrentThread(&env, nullptr) != JNI_OK) {
     KLOGE(kLogTag, "AttachCurrentThread (main) != JNI_OK");
-  else
-    init(env);
-
-  gAppHookLoaded = true;
+    gAppHookLoaded = false;
+    return kRunAttachFailed;
+  }
+  bool ok = init(env);
+  if (!ok) {
+    KLOGE(kLogTag, "AppHook init failed");
+    gAppHookLoaded = false;
+    return kRunInitFailed;
+  }
+  return kRunSuccess;
 }

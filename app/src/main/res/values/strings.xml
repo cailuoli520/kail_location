@@ -431,6 +431,8 @@
     <string name="root_hide_start">开始隐藏</string>
     <string name="root_hide_stop">停止隐藏</string>
     <string name="root_hide_no_apps">请先选择目标应用并至少开启一项隐藏</string>
+    <string name="root_hide_added_apps">已添加的应用（%d）</string>
+    <string name="root_hide_remove_app">移除该应用</string>
     <string name="root_hide_select_apps">选择目标应用</string>
 
     <!-- WiFi Simulation -->

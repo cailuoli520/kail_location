@@ -62,7 +62,8 @@ object RootDeployer {
         "libfakeloc_initzygote.so",
         "libfakeloc_apphook.so",
         "liblhooker.so",
-        "libStepSensor.so"
+        "libStepSensor.so",
+        "libantidetect.so"
     )
 
     /**
@@ -97,6 +98,9 @@ object RootDeployer {
             refreshDexPayloadAtomic(context)
         }
 
+        // ── 1.5 补部署 LAntiDetect 库（不受"已就绪"判断影响）──
+        ensureAntiDetectLib(context)
+
         // ── 2. 注入 — 仅当本次开机尚未注入 system_server ──
         if (!isSystemServerInjectionCurrent(context)) {
             KailLog.i(null, TAG, "ensureBaseline: injection not current for this boot; trying ptrace")
@@ -125,6 +129,8 @@ object RootDeployer {
             KailLog.w(null, TAG, "ensureBaseline: no root; skipping")
             return false
         }
+
+        ensureAntiDetectLib(context)
 
         if (isSystemServerInjectionCurrent(context)) {
             diag.step("ptrace 注入 system_server", true, "同一开机/system_server PID 已注入过，跳过部署和重复 ptrace")
@@ -543,8 +549,40 @@ object RootDeployer {
         return ok
     }
 
-    fun deployFakelocLibs(context: Context): Boolean {
-        var initLoader = false
+    /**
+     * 确保 LAntiDetect 依赖的 libantidetect.so / libantidetect64.so 已部署到
+     * FAKELOC_DIR（无版本号——LAntiDetect.loadAndInitialize 硬编码
+     * System.load("/data/kail-loc/libantidetect64.so")）。
+     *
+     * 独立于"注入已就绪"判断：版本号不变时全量部署会跳过，但这份库缺了
+     * "隐藏应用列表"的原生层就起不来（UnsatisfiedLinkError）。
+     */
+    fun ensureAntiDetectLib(context: Context): Boolean {
+        val plain = File(FAKELOC_DIR, "libantidetect.so")
+        val plain64 = File(FAKELOC_DIR, "libantidetect64.so")
+        if (plain.exists() && plain.length() > 0L && plain64.exists() && plain64.length() > 0L) {
+            return true
+        }
+        val src = File(context.applicationInfo.nativeLibraryDir, "libantidetect.so")
+        if (!src.exists()) {
+            KailLog.w(null, TAG, "ensureAntiDetectLib: APK 无 libantidetect.so")
+            return false
+        }
+        rootCmd("mkdir -p $FAKELOC_DIR && chmod 777 $FAKELOC_DIR", ROOT_SHORT_TIMEOUT_MS)
+        val ok = copyAndChmod(context, src, "lib/${preferredAbi()}/libantidetect.so", plain)
+        if (ok) {
+            rootCmd(
+                "cp -f ${plain.absolutePath} ${plain64.absolutePath} && " +
+                    "chmod 644 ${plain.absolutePath} ${plain64.absolutePath} && " +
+                    "chcon u:object_r:system_file:s0 ${plain.absolutePath} ${plain64.absolutePath} 2>/dev/null || true",
+                ROOT_COPY_TIMEOUT_MS
+            )
+            KailLog.i(null, TAG, "ensureAntiDetectLib: staged libantidetect for LAntiDetect")
+        }
+        return ok
+    }
+
+    fun deployFakelocLibs(context: Context): Boolean {        var initLoader = false
         val abi = preferredAbi()
         val isArm64 = abi == "arm64-v8a"
         val v = currentAppVersionCode(context)
@@ -576,6 +614,20 @@ object RootDeployer {
                 rootCmd("cp -f ${versioned.absolutePath} ${mirror.absolutePath}", ROOT_COPY_TIMEOUT_MS)
                 rootCmd("chmod 777 ${mirror.absolutePath}")
                 rootCmd("chcon u:object_r:system_file:s0 ${mirror.absolutePath} 2>/dev/null || true")
+            }
+            // LAntiDetect 硬编码 System.load("/data/kail-loc/libantidetect64.so")
+            // （无版本号，arm 侧是 libantidetect.so），版本化副本满足不了它，
+            // 额外放一份无版本号副本，否则"隐藏应用列表"的原生层起不来。
+            if (ok && name == "libantidetect.so") {
+                val plain = File(FAKELOC_DIR, "libantidetect.so")
+                val plain64 = File(FAKELOC_DIR, "libantidetect64.so")
+                rootCmd(
+                    "cp -f ${versioned.absolutePath} ${plain.absolutePath} && " +
+                        "cp -f ${versioned.absolutePath} ${plain64.absolutePath} && " +
+                        "chmod 644 ${plain.absolutePath} ${plain64.absolutePath} && " +
+                        "chcon u:object_r:system_file:s0 ${plain.absolutePath} ${plain64.absolutePath} 2>/dev/null || true",
+                    ROOT_COPY_TIMEOUT_MS
+                )
             }
         }
         return initLoader

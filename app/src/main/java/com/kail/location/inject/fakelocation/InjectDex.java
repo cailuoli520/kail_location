@@ -142,6 +142,7 @@ public class InjectDex {
             LHooker.suspendAll();
             com.kail.location.inject.utils.InjectLog.persist("InjectDex", "init finished, all services registered");
             writeBootstrapState("finished", null);
+            startAntiDetectConfigPoller(context);
             return null;
         } catch (RuntimeException th) {
             com.kail.location.inject.utils.InjectLog.e("InjectDex", "init runtime error", th);
@@ -182,6 +183,57 @@ public class InjectDex {
 
     public static Context getApplicationContext() {
         return applicationContext;
+    }
+
+    /**
+     * 反检测（隐藏应用列表）文件通道的 system_server 侧轮询器。
+     *
+     * 在 SELinux Enforcing 设备上，oem_security binder 可能 find 不到，配置走 binder
+     * 推送不进来。这里像 RootLocationControl 一样，在 system_server 内轮询
+     * /data/kail-loc/antidetect_config.txt：一旦 Kail 写好配置，就安装
+     * PackageManagerServiceHook 并把这些配置写入 PackageAntiDetectionConfig。
+     */
+    private static void startAntiDetectConfigPoller(final Context context) {
+        Thread t = new Thread(new Runnable() {
+            @Override
+            public void run() {
+                boolean wasEnabled = false;
+                while (true) {
+                    try {
+                        com.kail.location.inject.utils.AntiDetectConfigFile.Config cfg =
+                                com.kail.location.inject.utils.AntiDetectConfigFile.read();
+                        if (cfg.hookEnabled) {
+                            if (!wasEnabled) {
+                                com.kail.location.inject.utils.PackageAntiDetectionConfig.setPackageFilterEnabled(true);
+                                com.kail.location.inject.utils.PackageAntiDetectionConfig.setPackageVisibilityFilterEnabled(true);
+                                com.kail.location.inject.utils.PackageAntiDetectionConfig.setTargetPackages(cfg.targetPackages);
+                                com.kail.location.inject.utils.PackageAntiDetectionConfig.setDetectedPackages(cfg.detectedPackages);
+                                // 安装钩子（幂等，packageManagerHooked 守卫）
+                                com.kail.location.inject.fakelocation.hook.system.PackageManagerServiceHook
+                                        .hook(context.getClassLoader());
+                                com.kail.location.inject.utils.InjectLog.persist(
+                                        "InjectDex", "antidetect config file applied: detected=", cfg.detectedPackages);
+                                wasEnabled = true;
+                            }
+                        } else if (wasEnabled) {
+                            com.kail.location.inject.utils.PackageAntiDetectionConfig.setPackageFilterEnabled(false);
+                            com.kail.location.inject.utils.PackageAntiDetectionConfig.setPackageVisibilityFilterEnabled(false);
+                            com.kail.location.inject.utils.PackageAntiDetectionConfig.setTargetPackages(null);
+                            com.kail.location.inject.utils.PackageAntiDetectionConfig.setDetectedPackages(null);
+                            wasEnabled = false;
+                        }
+                    } catch (Throwable th) {
+                        com.kail.location.inject.utils.InjectLog.e("InjectDex", "antidetect config poller error", th);
+                    }
+                    try {
+                        Thread.sleep(400L);
+                    } catch (InterruptedException ignored) {
+                    }
+                }
+            }
+        }, "KailAntiDetectConfig");
+        t.setDaemon(true);
+        t.start();
     }
 
     static void log(String message) {

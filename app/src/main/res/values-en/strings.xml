@@ -743,6 +743,8 @@
     <string name="root_hide_start">Start Hiding</string>
     <string name="root_hide_stop">Stop Hiding</string>
     <string name="root_hide_no_apps">Please select target apps and enable at least one hiding option</string>
+    <string name="root_hide_added_apps">Added apps (%d)</string>
+    <string name="root_hide_remove_app">Remove this app</string>
     <string name="root_hide_select_apps">Select Target Apps</string>
 
     <!-- Independent Simulation -->

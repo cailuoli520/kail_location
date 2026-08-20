@@ -702,6 +702,8 @@
     <string name="root_hide_start">開始隱藏</string>
     <string name="root_hide_stop">停止隱藏</string>
     <string name="root_hide_no_apps">請先選擇目標應用並至少開啟一項隱藏</string>
+    <string name="root_hide_added_apps">已新增的應用（%d）</string>
+    <string name="root_hide_remove_app">移除該應用</string>
     <string name="root_hide_select_apps">選擇目標應用</string>
 
 

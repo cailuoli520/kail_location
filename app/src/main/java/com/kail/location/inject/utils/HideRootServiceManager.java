@@ -16,15 +16,16 @@ public class HideRootServiceManager {
     }
 
     public List<String> getHiddenPackages() {
-        if (getHideRootService() == null) {
-            return null;
+        IHideRootManager svc = getHideRootService();
+        if (svc != null) {
+            try {
+                return svc.getHiddenPackages();
+            } catch (RemoteException e) {
+                e.printStackTrace();
+            }
         }
-        try {
-            return this.hideRootService.getHiddenPackages();
-        } catch (RemoteException e) {
-            e.printStackTrace();
-            return null;
-        }
+        // binder 不可用（Enforcing 下 find 被 SELinux 拦截）时退到文件通道。
+        return HideConfigFile.getPackages();
     }
 
     public List<String> getHiddenProcesses() {
@@ -51,27 +52,27 @@ public class HideRootServiceManager {
     }
 
     public boolean isHideRootEnabled() {
-        if (getHideRootService() == null) {
-            return false;
+        IHideRootManager svc = getHideRootService();
+        if (svc != null) {
+            try {
+                return svc.isHideRootEnabled();
+            } catch (RemoteException e) {
+                e.printStackTrace();
+            }
         }
-        try {
-            return this.hideRootService.isHideRootEnabled();
-        } catch (RemoteException e) {
-            e.printStackTrace();
-            return false;
-        }
+        return HideConfigFile.isEnabled();
     }
 
     public boolean isHideAppListEnabled() {
-        if (getHideRootService() == null) {
-            return false;
+        IHideRootManager svc = getHideRootService();
+        if (svc != null) {
+            try {
+                return svc.isHideAppListEnabled();
+            } catch (RemoteException e) {
+                e.printStackTrace();
+            }
         }
-        try {
-            return this.hideRootService.isHideAppListEnabled();
-        } catch (RemoteException e) {
-            e.printStackTrace();
-            return false;
-        }
+        return HideConfigFile.isHideAppListEnabled();
     }
 
     public void disableHideRoot() {

@@ -375,12 +375,77 @@ public class RootHideHook {
         Code decompiled incorrectly, please refer to instructions dump.
         To view partially-correct code enable 'Show inconsistent code' option in preferences
     */
-    public static void File2(java.lang.Object r19, java.lang.String r20, java.lang.String r21) {
-        /*
-            Method dump skipped, instruction units count: 831
-            To view this dump change 'Code comments level' option to 'DEBUG'
-        */
-        throw new UnsupportedOperationException("Method not decompiled: com.lerist.inject.fakelocation.hook.app.RootHideHook.File2(java.lang.Object, java.lang.String, java.lang.String):void");
+    public static void File2(Object obj, String parent, String child) {
+        String child2 = child;
+        log("File2", obj, "parent:" + parent, "child:" + child2);
+        try {
+            // 参照已实现的 File3（File parent, String child）还原：File(String parent, String child)。
+            if (AntiDetectionServiceManager.getInstance().isAntiDetectionEnabled() && AntiDetectionServiceManager.getInstance().isHookRulesEnabled()) {
+                if (!TextUtils.isEmpty(child2)) {
+                    Iterator<String> it = antiDetectionFileNameRedirects.keySet().iterator();
+                    while (it.hasNext()) {
+                        String next = it.next();
+                        if (child2.equals(next)) {
+                            child2 = antiDetectionFileNameRedirects.get(next);
+                            log("File2", obj, "parent:" + parent, "child_new:" + child2);
+                            break;
+                        }
+                    }
+                }
+                if (parent != null) {
+                    String path = parent;
+                    if (!path.contains(AppProcessHook.currentPackageName) && !("" + child2).contains(AppProcessHook.currentPackageName)) {
+                        for (String key : antiDetectionPathRedirects.keySet()) {
+                            if (path.startsWith(key)) {
+                                String newParent = path.replaceFirst(key, (String) antiDetectionPathRedirects.get(key));
+                                log("File2", obj, "parent_new:" + newParent, "child:" + child2);
+                                File2_bak(obj, newParent, child2);
+                                return;
+                            }
+                            String joined = path + (path.endsWith("/") ? "" : "/") + child2;
+                            if (joined.startsWith(key)) {
+                                String newParent = joined.replaceFirst(key, (String) antiDetectionPathRedirects.get(key)).replace(child2, "");
+                                log("File2", obj, "parent_new:" + newParent, "child:" + child2);
+                                File2_bak(obj, newParent, child2);
+                                return;
+                            }
+                        }
+                    }
+                }
+            }
+            if (HideRootServiceManager.getInstance().isHideRootEnabled()) {
+                if (!TextUtils.isEmpty(child2)) {
+                    for (String key : rootFileNameRedirects.keySet()) {
+                        if (child2.equals(key)) {
+                            child2 = (String) rootFileNameRedirects.get(key);
+                            log("File2", obj, "parent:" + parent, "child_new:" + child2);
+                            break;
+                        }
+                    }
+                }
+                if (parent != null) {
+                    for (String key : rootPathRedirects.keySet()) {
+                        if (parent.startsWith(key)) {
+                            String newParent = parent.replaceFirst(key, (String) rootPathRedirects.get(key));
+                            log("File2", obj, "parent_new:" + newParent, "child:" + child2);
+                            File2_bak(obj, newParent, child2);
+                            return;
+                        }
+                        String joined = parent + (parent.endsWith("/") ? "" : "/") + child2;
+                        if (joined.startsWith(key)) {
+                            String newParent = joined.replaceFirst(key, (String) rootPathRedirects.get(key)).replace(child2, "");
+                            log("File2", obj, "parent_new:" + newParent, "child:" + child2);
+                            File2_bak(obj, newParent, child2);
+                            return;
+                        }
+                    }
+                }
+            }
+            File2_bak(obj, parent, child2);
+        } catch (Throwable th) {
+            th.printStackTrace();
+            throw th;
+        }
     }
 
     public static void File2_bak(Object obj, String str, String str2) {

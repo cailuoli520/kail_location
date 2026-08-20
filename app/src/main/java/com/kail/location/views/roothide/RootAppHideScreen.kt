@@ -5,7 +5,8 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -14,14 +15,17 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.shape.RoundedCornerShape
 import com.kail.location.R
 import com.kail.location.viewmodels.RootAppHideViewModel
 import com.kail.location.views.common.AppDrawer
 import com.kail.location.views.common.BadgedControl
 import com.kail.location.views.common.HelpActionButton
 import com.kail.location.views.common.HelpOverlayScrim
+import com.kail.location.views.independentsimulation.AppInfo
 import com.kail.location.views.independentsimulation.AppPickerDialog
 import kotlinx.coroutines.launch
 
@@ -54,6 +58,18 @@ fun RootAppHideScreen(
     var showHelp by remember { mutableStateOf(false) }
     var selectedPackages by remember {
         mutableStateOf(targetPackages.split(",").map { it.trim() }.filter { it.isNotEmpty() }.toSet())
+    }
+
+    val appInfos = remember(selectedPackages) {
+        val pm = context.packageManager
+        selectedPackages.mapNotNull { pkg ->
+            try {
+                val ai = pm.getApplicationInfo(pkg, 0)
+                AppInfo(pkg, pm.getApplicationLabel(ai)?.toString() ?: pkg)
+            } catch (e: Exception) {
+                AppInfo(pkg, pkg)
+            }
+        }.sortedBy { it.appName }
     }
 
     val canStart = selectedPackages.isNotEmpty() && (hideRoot || hideAppList)
@@ -204,48 +220,85 @@ fun RootAppHideScreen(
                 }
             }
 
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(16.dp))
 
-            // Target Apps
-            BadgedControl(show = showHelp, number = 4) {
-                OutlinedCard(
-                    modifier = Modifier.fillMaxWidth(),
-                    onClick = { showAppPicker = true }
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+            // Added apps section header with "+" button
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    text = stringResource(R.string.root_hide_added_apps, selectedPackages.size),
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold
+                )
+                BadgedControl(show = showHelp, number = 4) {
+                    SmallFloatingActionButton(
+                        onClick = { showAppPicker = true },
+                        containerColor = MaterialTheme.colorScheme.secondary
                     ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = stringResource(R.string.root_hide_target_apps),
-                                style = MaterialTheme.typography.titleSmall
-                            )
-                            Text(
-                                text = if (selectedPackages.isEmpty())
-                                    stringResource(R.string.root_hide_target_apps_hint)
-                                else
-                                    stringResource(R.string.ind_sim_selected_count, selectedPackages.size),
-                                style = MaterialTheme.typography.bodySmall,
-                                modifier = Modifier.padding(top = 4.dp)
-                            )
-                        }
-                        Icon(
-                            imageVector = Icons.Default.Check,
-                            contentDescription = null,
-                            tint = if (selectedPackages.isNotEmpty()) MaterialTheme.colorScheme.primary else Color.Gray
-                        )
+                        Icon(Icons.Default.Add, contentDescription = stringResource(R.string.root_hide_target_apps), tint = Color.White)
                     }
                 }
             }
 
-            Spacer(modifier = Modifier.height(32.dp))
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // Added apps list (each row deletable)
+            if (appInfos.isEmpty()) {
+                Text(
+                    text = stringResource(R.string.root_hide_target_apps_hint),
+                    color = Color.Gray,
+                    fontSize = 13.sp,
+                    modifier = Modifier.padding(vertical = 12.dp)
+                )
+            } else {
+                appInfos.forEachIndexed { index, info ->
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = info.appName,
+                                    fontSize = 16.sp,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                                Text(
+                                    text = info.packageName,
+                                    fontSize = 12.sp,
+                                    color = Color.Gray
+                                )
+                            }
+                            BadgedControl(show = showHelp && index == 0, number = 5) {
+                                IconButton(onClick = {
+                                    val newSet = selectedPackages - info.packageName
+                                    selectedPackages = newSet
+                                    viewModel.setTargetPackages(newSet.joinToString(","))
+                                }) {
+                                    Icon(
+                                        Icons.Default.Delete,
+                                        contentDescription = stringResource(R.string.root_hide_remove_app),
+                                        tint = Color.Red
+                                    )
+                                }
+                            }
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
 
             // Start/Stop Button
-            BadgedControl(show = showHelp, number = 5) {
+            BadgedControl(show = showHelp, number = 6) {
                 Button(
                     onClick = {
                         if (!isEnabled && !canStart) return@Button
@@ -293,8 +346,9 @@ fun RootAppHideScreen(
                 1 to R.string.help_root_hide_menu,
                 2 to R.string.help_root_hide_hide_root_switch,
                 3 to R.string.help_root_hide_hide_applist_switch,
-                4 to R.string.help_root_hide_target_apps,
-                5 to R.string.help_root_hide_start_stop
+                4 to R.string.help_root_hide_add_app,
+                5 to R.string.help_root_hide_delete_app,
+                6 to R.string.help_root_hide_start_stop
             ),
             onDismiss = { showHelp = false }
         )

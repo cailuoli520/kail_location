@@ -699,6 +699,8 @@
     <string name="root_hide_start">非表示開始</string>
     <string name="root_hide_stop">非表示停止</string>
     <string name="root_hide_no_apps">対象アプリを選択し、少なくとも1つの非表示オプションを有効にしてください</string>
+    <string name="root_hide_added_apps">追加済みのアプリ（%d）</string>
+    <string name="root_hide_remove_app">このアプリを削除</string>
     <string name="root_hide_select_apps">対象アプリを選択</string>
 
 

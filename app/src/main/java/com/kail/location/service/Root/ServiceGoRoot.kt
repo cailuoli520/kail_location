@@ -20,6 +20,7 @@ import androidx.preference.PreferenceManager
 import com.kail.location.R
 import com.kail.location.geo.GeoPredict
 import com.kail.location.inject.fakelocation.aidl.IMockLocationManager
+import com.kail.location.inject.utils.HideConfigFile
 import com.kail.location.inject.utils.RootControlPaths
 import com.kail.location.inject.utils.ServiceManagerBridge
 import com.kail.location.root.NativeSensorHook
@@ -907,6 +908,55 @@ class ServiceGoRoot : Service() {
     }
 
     /**
+     * 把隐藏配置写进文件通道（/data/kail-loc/hide_config.txt）。
+     *
+     * 目标进程的 Hook（HideRootServiceManager#isHideRootEnabled 等）在解析不到
+     * oem_integrity binder（SELinux Enforcing 下 find 被拦截）时会直接读这个文件，
+     * 效果与 binder 推送等价：enabled 决定是否隐藏，packages 是目标白名单，
+     * hide_app_list 决定是否连已安装列表一起藏。关闭时写 enabled=0。
+     */
+    private fun writeHideConfigFile(enabled: Boolean) {
+        val content = if (enabled) {
+            "enabled=1\n" +
+                "hide_app_list=${if (hideAppListEnabled) 1 else 0}\n" +
+                "packages=${pendingHidePackages.joinToString(",")}\n"
+        } else {
+            "enabled=0\n"
+        }
+        val cmd = "mkdir -p /data/kail-loc && chmod 777 /data/kail-loc && " +
+            "printf '%s' ${shellSingleQuote(content)} > ${HideConfigFile.PATH} && chmod 644 ${HideConfigFile.PATH}"
+        runCatching { ShellUtils.executeCommand(cmd) }
+            .onFailure { KailLog.e(this, TAG, "writeHideConfigFile: ${it.message}") }
+        KailLog.i(this, TAG, "hide config file written: enabled=$enabled pkgs=${if (enabled) pendingHidePackages.joinToString() else "-"}")
+    }
+
+    /**
+     * 隐藏应用列表的文件通道：写 /data/kail-loc/antidetect_config.txt。
+     *
+     * system_server 内 InjectDex 的 KailAntiDetectConfig 轮询器读这个文件来安装
+     * PackageManagerServiceHook 并配置过滤。detected 用隐藏白名单里每一个包：
+     * 对这些"隐藏目标"（如沙盒）过滤掉别的应用；同时把目标写进 target，让
+     * PackageAntiDetectionConfig.isPackageAllowedForPidUid 对沙盒返回 true，
+     * 钩子才会对沙盒生效。
+     */
+    private fun writeAntiDetectConfigFile(enabled: Boolean) {
+        val content = if (enabled) {
+            "hook_enabled=1\n" +
+                "filter_enabled=1\n" +
+                "visibility_filter=1\n" +
+                "detected_packages=${pendingHidePackages.joinToString(",")}\n" +
+                "target_packages=${pendingHidePackages.joinToString(",")}\n"
+        } else {
+            "hook_enabled=0\n"
+        }
+        val cmd = "mkdir -p /data/kail-loc && chmod 777 /data/kail-loc && " +
+            "printf '%s' ${shellSingleQuote(content)} > /data/kail-loc/antidetect_config.txt && chmod 644 /data/kail-loc/antidetect_config.txt"
+        runCatching { ShellUtils.executeCommand(cmd) }
+            .onFailure { KailLog.e(this, TAG, "writeAntiDetectConfigFile: ${it.message}") }
+        KailLog.i(this, TAG, "antidetect config file written: enabled=$enabled targets=${if (enabled) pendingHidePackages.joinToString() else "-"}")
+    }
+
+    /**
      * Stage the inject (so oem_integrity exists), push the hide config,
      * and inject every target app process so RootHideHook installs there.
      */
@@ -914,34 +964,46 @@ class ServiceGoRoot : Service() {
         runCatching { RootDeployer.ensureBaseline(this) }
             .onFailure { KailLog.e(this, TAG, "RootDeployer.ensureBaseline (hide): ${it.message}") }
 
+        // 文件通道：无论 oem_integrity binder 是否可解析，都先把配置写进
+        // /data/kail-loc/hide_config.txt。目标进程的 Hook（HideRootServiceManager）
+        // 在 binder 不可用时直接读该文件判断开关，绕开 SELinux 对 find 的拦截。
+        writeHideConfigFile(hideRootEnabled && pendingHidePackages.isNotEmpty())
+        // 隐藏应用列表的文件通道：system_server 内的轮询器读
+        // /data/kail-loc/antidetect_config.txt 来安装 PackageManagerServiceHook。
+        writeAntiDetectConfigFile(hideAppListEnabled && hideRootEnabled && pendingHidePackages.isNotEmpty())
+
         val svc = resolveHideRootService()
-        if (svc == null) {
-            KailLog.w(this, TAG, "oem_integrity binder not online yet")
-            return
+        if (svc != null) {
+            val pkgs = ArrayList(pendingHidePackages)
+            runCatching {
+                // refreshHideRootEnabled flips the master switch on only when the
+                // license is usable; pair it with disableHideRoot when turning off.
+                if (hideRootEnabled && pkgs.isNotEmpty()) {
+                    svc.setHiddenPackages(pkgs)
+                    svc.setHideAppListEnabled(hideAppListEnabled)
+                    svc.refreshHideRootEnabled()
+                } else {
+                    svc.disableHideRoot()
+                    svc.setHideAppListEnabled(false)
+                    svc.setHiddenPackages(null)
+                    svc.setHiddenProcesses(null)
+                }
+                KailLog.i(
+                    this, TAG,
+                    "hide config pushed: hideRoot=$hideRootEnabled hideAppList=$hideAppListEnabled pkgs=${pkgs.joinToString()}"
+                )
+            }.onFailure { KailLog.e(this, TAG, "push hide config: ${it.message}") }
+        } else {
+            // SELinux Enforcing 下 find 被拦，binder 不可解析：配置已走文件通道，
+            // 这里不 return，目标进程注入仍要继续，否则 Hook 装不上去。
+            KailLog.w(this, TAG, "oem_integrity binder not online yet（已走文件通道写配置，继续注入目标进程）")
         }
-        val pkgs = ArrayList(pendingHidePackages)
-        runCatching {
-            // refreshHideRootEnabled flips the master switch on only when the
-            // license is usable; pair it with disableHideRoot when turning off.
-            if (hideRootEnabled && pkgs.isNotEmpty()) {
-                svc.setHiddenPackages(pkgs)
-                svc.setHideAppListEnabled(hideAppListEnabled)
-                svc.refreshHideRootEnabled()
-            } else {
-                svc.disableHideRoot()
-                svc.setHideAppListEnabled(false)
-                svc.setHiddenPackages(null)
-                svc.setHiddenProcesses(null)
-            }
-            KailLog.i(
-                this, TAG,
-                "hide config pushed: hideRoot=$hideRootEnabled hideAppList=$hideAppListEnabled pkgs=${pkgs.joinToString()}"
-            )
-        }.onFailure { KailLog.e(this, TAG, "push hide config: ${it.message}") }
 
         // Hooks only fire in an app process after it has been app-hook-injected.
+        // 注：这段不能放在 binder 分支内——binder 不可用时也必须注入，
+        // 目标进程的 RootHideHook 会改读 hide_config.txt（文件通道）判断开关。
         if (hideRootEnabled) {
-            for (pkg in pkgs) {
+            for (pkg in pendingHidePackages) {
                 runCatching { RootDeployer.injectAppProcess(applicationContext, pkg) }
                     .onFailure { KailLog.e(this, TAG, "inject $pkg (hide): ${it.message}") }
             }
@@ -949,6 +1011,8 @@ class ServiceGoRoot : Service() {
     }
 
     private fun stopHideOnInjection(retry: Boolean = true) {
+        writeHideConfigFile(false)
+        writeAntiDetectConfigFile(false)
         val svc = resolveHideRootService(retry)
         val pkgsToRestart = pendingHidePackages.ifEmpty {
             runCatching { svc?.hiddenPackages ?: emptyList() }.getOrDefault(emptyList())
