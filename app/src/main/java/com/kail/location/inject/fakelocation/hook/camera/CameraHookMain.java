@@ -1,6 +1,6 @@
 package com.kail.location.inject.fakelocation.hook.camera;
 
-import com.kail.location.utils.KailLog;
+import com.kail.location.inject.utils.InjectLog;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
@@ -38,10 +38,10 @@ public final class CameraHookMain {
                 Camera1Hook.hook(cl);
                 Camera2Hook.hook(cl);
                 MicrophoneHook.hook(cl);
-                KailLog.INSTANCE.i(null, TAG, "camera hooks installed for " + packageName);
+                InjectLog.i(TAG, "camera hooks installed for " + packageName);
             }
         } catch (Throwable th) {
-            KailLog.INSTANCE.e(null, TAG, "hook failed", th);
+            InjectLog.e(TAG, "hook failed", th);
         }
     }
 
@@ -82,7 +82,7 @@ public final class CameraHookMain {
     private static void onSessionStart(CameraHookConfig cfg) {
         if (!cfg.isStreamMode() && !cfg.isImageMode() && cfg.hasRandomPool()) {
             sessionVideoPath = pickRandomVideo(cfg.videoDir);
-            KailLog.INSTANCE.i(null, TAG, "random play picked: " + sessionVideoPath);
+            InjectLog.i(TAG, "random play picked: " + sessionVideoPath);
         } else {
             sessionVideoPath = cfg.videoPath;
         }

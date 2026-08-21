@@ -734,6 +734,7 @@
     <string name="root_hide_status_running">Hiding Active</string>
     <string name="root_hide_status_stopped">Hiding Stopped</string>
     <string name="root_hide_desc">Select target apps and enable. When enabled, Root/framework traces and installed app list will be hidden from selected apps. Other apps are unaffected.</string>
+    <string name="root_hide_settings_title">Hide settings</string>
     <string name="root_hide_hide_root">Hide Root</string>
     <string name="root_hide_hide_root_summary">Hide Root, Magisk, Xposed traces from target apps</string>
     <string name="root_hide_hide_applist">Hide App List</string>

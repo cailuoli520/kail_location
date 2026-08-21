@@ -693,6 +693,7 @@
     <string name="root_hide_status_running">隱藏執行中</string>
     <string name="root_hide_status_stopped">隱藏已停止</string>
     <string name="root_hide_desc">選擇目標應用後開啟。開啟後，對選中的應用隱藏 Root/框架痕跡與已安裝應用列表。</string>
+    <string name="root_hide_settings_title">隱藏設定</string>
     <string name="root_hide_hide_root">隱藏 Root</string>
     <string name="root_hide_hide_root_summary">對目標應用隱藏 Root、Magisk、Xposed 等痕跡</string>
     <string name="root_hide_hide_applist">隱藏應用列表</string>

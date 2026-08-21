@@ -10,7 +10,7 @@ import android.graphics.RectF;
 import android.graphics.SurfaceTexture;
 import android.view.Surface;
 
-import com.kail.location.utils.KailLog;
+import com.kail.location.inject.utils.InjectLog;
 
 import java.io.File;
 
@@ -47,7 +47,7 @@ public final class CameraImageSource {
         if (bitmap == null || !path.equals(loadedPath) || rotOffset != rotationOffset) {
             Bitmap raw = BitmapFactory.decodeFile(path);
             if (raw == null) {
-                KailLog.INSTANCE.e(null, TAG, "decode failed: " + path);
+                InjectLog.e(TAG, "decode failed: " + path);
                 return null;
             }
             int rot = ((rotOffset % 360) + 360) % 360;
@@ -83,7 +83,7 @@ public final class CameraImageSource {
             System.arraycopy(nv21Cache, 0, dst, 0, nv21Cache.length);
             return true;
         } catch (Throwable th) {
-            KailLog.INSTANCE.e(null, TAG, "fillFrame", th);
+            InjectLog.e(TAG, "fillFrame", th);
             return false;
         }
     }
@@ -113,7 +113,7 @@ public final class CameraImageSource {
                 }
             }
         } catch (Throwable th) {
-            KailLog.INSTANCE.e(null, TAG, "drawInto", th);
+            InjectLog.e(TAG, "drawInto", th);
             return false;
         }
     }
@@ -125,7 +125,7 @@ public final class CameraImageSource {
             drawInto(s, path, rotOffset);
             s.release();
         } catch (Throwable th) {
-            KailLog.INSTANCE.e(null, TAG, "drawInto(texture)", th);
+            InjectLog.e(TAG, "drawInto(texture)", th);
         }
     }
 

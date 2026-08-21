@@ -690,6 +690,7 @@
     <string name="root_hide_status_running">非表示実行中</string>
     <string name="root_hide_status_stopped">非表示停止中</string>
     <string name="root_hide_desc">対象アプリを選択して有効化すると、Root/フレームワークの痕跡とインストール済みアプリ一覧が対象アプリから隠されます。</string>
+    <string name="root_hide_settings_title">非表示設定</string>
     <string name="root_hide_hide_root">Root を隠す</string>
     <string name="root_hide_hide_root_summary">対象アプリから Root、Magisk、Xposed の痕跡を隠す</string>
     <string name="root_hide_hide_applist">アプリ一覧を隠す</string>

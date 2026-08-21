@@ -1,7 +1,7 @@
 package com.kail.location.inject.fakelocation.hook.camera;
 
 
-import com.kail.location.utils.KailLog;
+import com.kail.location.inject.utils.InjectLog;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -95,7 +95,7 @@ public final class CameraHookConfig {
             String json = new String(buf, 0, off, "UTF-8").trim();
             parseInto(json, cfg);
         } catch (Throwable th) {
-            KailLog.INSTANCE.e(null, TAG, "load config failed", th);
+            InjectLog.e(TAG, "load config failed", th);
         }
         return cfg;
     }

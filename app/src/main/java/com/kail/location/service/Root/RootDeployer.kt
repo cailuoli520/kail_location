@@ -491,7 +491,46 @@ object RootDeployer {
         val cmd = "${injector.absolutePath} -P $processName -l ${appLoader.absolutePath} -n com.kail.location"
         val out = rootCmd(cmd, ROOT_INJECT_TIMEOUT_MS)
         KailLog.i(null, TAG, "kail_inject ($processName) -> $out")
-        return out.contains("Inject ok")
+        if (out.contains("Inject ok")) return true
+
+        // The by-name path (findPidByProcessName, inject64.cpp:69) scans /proc
+        // and attaches to the FIRST exact-cmdline match. When the target is in
+        // the middle of a restart (post force-stop relaunch), that match can be
+        // racy/wrong and the injector exits with 0 bytes. Fall back to
+        // enumerating the package's exact-cmdline PIDs and injecting each by
+        // PID (-p) until one succeeds.
+        KailLog.w(null, TAG, "injectAppProcess: by-name failed for $processName; trying per-PID fallback")
+        for (pid in exactCmdlinePids(processName)) {
+            val pidCmd = "${injector.absolutePath} -p $pid -l ${appLoader.absolutePath} -n com.kail.location"
+            val pidOut = rootCmd(pidCmd, ROOT_INJECT_TIMEOUT_MS)
+            KailLog.i(null, TAG, "kail_inject ($processName pid=$pid) -> $pidOut")
+            if (pidOut.contains("Inject ok")) return true
+        }
+        return false
+    }
+
+    /**
+     * Root helper that lists /proc for processes whose cmdline equals
+     * [processName] exactly (the "main" process of a package — child
+     * processes carry a ':name' suffix and are excluded). Returns PIDs in
+     * ascending order.
+     */
+    private fun exactCmdlinePids(processName: String): List<Int> {
+        if (processName.isEmpty()) return emptyList()
+        return runCatching {
+            val script = "for d in /proc/[0-9]*; do " +
+                "c=\$(tr '\\0' ' ' < \"\$d/cmdline\" 2>/dev/null); " +
+                "case \" \$c \" in \" $processName \"*) p=\"\${d#/proc/}\"; echo \"\$p\";; esac; done"
+            rootCmd(script, ROOT_SHORT_TIMEOUT_MS)
+                .lineSequence()
+                .mapNotNull { it.trim().toIntOrNull() }
+                .distinct()
+                .sorted()
+                .toList()
+        }.getOrElse {
+            KailLog.w(null, TAG, "exactCmdlinePids failed: ${it.message}")
+            emptyList()
+        }
     }
 
     /**

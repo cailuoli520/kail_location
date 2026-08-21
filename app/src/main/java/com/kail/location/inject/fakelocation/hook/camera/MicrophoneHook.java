@@ -1,8 +1,8 @@
 package com.kail.location.inject.fakelocation.hook.camera;
 
 import android.media.AudioRecord;
+import com.kail.location.inject.utils.InjectLog;
 import com.kail.location.lib.lhooker.LHooker;
-import com.kail.location.utils.KailLog;
 
 import java.nio.ByteBuffer;
 
@@ -64,9 +64,9 @@ public final class MicrophoneHook {
             } catch (Throwable ignored) { }
 
             installed = true;
-            KailLog.INSTANCE.i(null, TAG, "Microphone hooks installed");
+            InjectLog.i(TAG, "Microphone hooks installed");
         } catch (Throwable th) {
-            KailLog.INSTANCE.e(null, TAG, "hook install failed", th);
+            InjectLog.e(TAG, "hook install failed", th);
         }
     }
 

@@ -4,8 +4,8 @@ import android.graphics.SurfaceTexture;
 import android.hardware.Camera;
 import android.view.SurfaceHolder;
 
+import com.kail.location.inject.utils.InjectLog;
 import com.kail.location.lib.lhooker.LHooker;
-import com.kail.location.utils.KailLog;
 
 import java.lang.reflect.Method;
 import java.util.HashSet;
@@ -76,9 +76,9 @@ public final class Camera1Hook {
                     Void.TYPE, new Class[]{Camera.PreviewCallback.class},
                     Camera1Hook.class, "setPreviewCallbackWithBuffer");
             installed = true;
-            KailLog.INSTANCE.i(null, TAG, "Camera1 hooks installed");
+            InjectLog.i(TAG, "Camera1 hooks installed");
         } catch (Throwable th) {
-            KailLog.INSTANCE.e(null, TAG, "hook install failed", th);
+            InjectLog.e(TAG, "hook install failed", th);
         }
     }
 
@@ -101,7 +101,7 @@ public final class Camera1Hook {
                 setPreviewTexture_bak(receiver, null);
             }
         } catch (Throwable th) {
-            KailLog.INSTANCE.e(null, TAG, "setPreviewTexture hook", th);
+            InjectLog.e(TAG, "setPreviewTexture hook", th);
             setPreviewTexture_bak(receiver, texture);
         }
     }
@@ -132,7 +132,7 @@ public final class Camera1Hook {
                 feedSurface(holder.getSurface());
             }
         } catch (Throwable th) {
-            KailLog.INSTANCE.e(null, TAG, "setPreviewDisplay hook", th);
+            InjectLog.e(TAG, "setPreviewDisplay hook", th);
             try { setPreviewDisplay_bak(receiver, holder); } catch (Throwable ignored) { }
         }
     }
@@ -189,7 +189,7 @@ public final class Camera1Hook {
                     feedSurface(realHolder.getSurface());
                 }
             } catch (Throwable th) {
-                KailLog.INSTANCE.e(null, TAG, "startPreview hook", th);
+                InjectLog.e(TAG, "startPreview hook", th);
             }
         }
         startPreview_bak(receiver);
@@ -304,7 +304,7 @@ public final class Camera1Hook {
                     }
                 }
                 if (target == null) {
-                    KailLog.INSTANCE.w(null, TAG, "onPreviewFrame not found on " + cls.getName());
+                    InjectLog.w(TAG, "onPreviewFrame not found on " + cls.getName());
                     return;
                 }
                 String key = declaring.getName();
@@ -317,10 +317,10 @@ public final class Camera1Hook {
                         "onPreviewFrame_copy", Object.class, byte[].class, Camera.class);
                 LHooker.hookMethod(target, hook, bak, copy);
                 hookedCallbackClasses.add(key);
-                KailLog.INSTANCE.i(null, TAG, "hooked onPreviewFrame on " + key);
+                InjectLog.i(TAG, "hooked onPreviewFrame on " + key);
             }
         } catch (Throwable th) {
-            KailLog.INSTANCE.e(null, TAG, "hookPreviewCallback failed", th);
+            InjectLog.e(TAG, "hookPreviewCallback failed", th);
         }
     }
 

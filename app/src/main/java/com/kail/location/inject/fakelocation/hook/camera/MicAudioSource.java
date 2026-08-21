@@ -5,7 +5,7 @@ import android.media.MediaCodec;
 import android.media.MediaExtractor;
 import android.media.MediaFormat;
 
-import com.kail.location.utils.KailLog;
+import com.kail.location.inject.utils.InjectLog;
 
 import java.io.File;
 import java.nio.ByteBuffer;
@@ -189,7 +189,7 @@ public final class MicAudioSource {
                     }
                 }
                 if (track < 0 || format == null) {
-                    KailLog.INSTANCE.w(null, TAG, "no audio track in " + path);
+                    InjectLog.w(TAG, "no audio track in " + path);
                     sleepQuiet(2000);
                     continue;
                 }
@@ -233,7 +233,7 @@ public final class MicAudioSource {
                     }
                 }
             } catch (Throwable th) {
-                KailLog.INSTANCE.e(null, TAG, "decodeLoop", th);
+                InjectLog.e(TAG, "decodeLoop", th);
                 sleepQuiet(1000);
             } finally {
                 if (codec != null) {

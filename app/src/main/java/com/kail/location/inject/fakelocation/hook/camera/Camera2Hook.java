@@ -4,8 +4,8 @@ import android.graphics.SurfaceTexture;
 import android.media.ImageReader;
 import android.view.Surface;
 
+import com.kail.location.inject.utils.InjectLog;
 import com.kail.location.lib.lhooker.LHooker;
-import com.kail.location.utils.KailLog;
 
 import java.util.List;
 import java.util.Map;
@@ -83,7 +83,7 @@ public final class Camera2Hook {
                     new Class[]{List.class, sessionStateCb, android.os.Handler.class},
                     Camera2Hook.class, "createCaptureSessionByOutputs");
             } catch (Throwable th) {
-                KailLog.INSTANCE.w(null, TAG, "createCaptureSession hooks unavailable", th);
+                InjectLog.w(TAG, "createCaptureSession hooks unavailable", th);
             }
 
             // Track ImageReader surfaces so we keep them out of the redirect.
@@ -93,7 +93,7 @@ public final class Camera2Hook {
                         new Class[]{Integer.TYPE, Integer.TYPE, Integer.TYPE, Integer.TYPE},
                         Camera2Hook.class, "newInstance");
             } catch (Throwable th) {
-                KailLog.INSTANCE.w(null, TAG, "ImageReader.newInstance(4) hook unavailable", th);
+                InjectLog.w(TAG, "ImageReader.newInstance(4) hook unavailable", th);
             }
             try {
                 LHooker.hookMethodAutoBackup(ImageReader.class, "newInstance",
@@ -101,13 +101,13 @@ public final class Camera2Hook {
                         new Class[]{Integer.TYPE, Integer.TYPE, Integer.TYPE, Integer.TYPE, Long.TYPE},
                         Camera2Hook.class, "newInstance5");
             } catch (Throwable th) {
-                KailLog.INSTANCE.w(null, TAG, "ImageReader.newInstance(5) hook unavailable", th);
+                InjectLog.w(TAG, "ImageReader.newInstance(5) hook unavailable", th);
             }
 
             installed = true;
-            KailLog.INSTANCE.i(null, TAG, "Camera2 hooks installed");
+            InjectLog.i(TAG, "Camera2 hooks installed");
         } catch (Throwable th) {
-            KailLog.INSTANCE.e(null, TAG, "hook install failed", th);
+            InjectLog.e(TAG, "hook install failed", th);
         }
     }
 
@@ -126,7 +126,7 @@ public final class Camera2Hook {
                     return;
                 }
             } catch (Throwable th) {
-                KailLog.INSTANCE.e(null, TAG, "addTarget hook", th);
+                InjectLog.e(TAG, "addTarget hook", th);
             }
         }
         addTarget_bak(receiver, surface);
@@ -209,7 +209,7 @@ public final class Camera2Hook {
                     return;
                 }
             } catch (Throwable th) {
-                KailLog.INSTANCE.e(null, TAG, "createCaptureSession hook", th);
+                InjectLog.e(TAG, "createCaptureSession hook", th);
             }
         }
         createCaptureSession_bak(receiver, outputs, callback, handler);
@@ -266,7 +266,7 @@ public final class Camera2Hook {
                     }
                 }
             } catch (Throwable th) {
-                KailLog.INSTANCE.e(null, TAG, "createCaptureSessionConfig", th);
+                InjectLog.e(TAG, "createCaptureSessionConfig", th);
             }
         }
         createCaptureSessionConfig_bak(receiver, config);
@@ -308,7 +308,7 @@ public final class Camera2Hook {
                     return;
                 }
             } catch (Throwable th) {
-                KailLog.INSTANCE.e(null, TAG, "createCaptureSessionByOutputs", th);
+                InjectLog.e(TAG, "createCaptureSessionByOutputs", th);
             }
         }
         createCaptureSessionByOutputs_bak(receiver, outputs, callback, handler);
@@ -367,7 +367,7 @@ public final class Camera2Hook {
                 readerSurfaces.add(s);
             }
         } catch (Throwable th) {
-            KailLog.INSTANCE.e(null, TAG, "trackReader", th);
+            InjectLog.e(TAG, "trackReader", th);
         }
     }
 

@@ -422,6 +422,7 @@
     <string name="root_hide_status_running">隐藏运行中</string>
     <string name="root_hide_status_stopped">隐藏已停止</string>
     <string name="root_hide_desc">选择目标应用后开启。开启后，对选中的应用隐藏 Root / 框架痕迹与已安装应用列表，其它应用不受影响。底层通过 FakeLocation 注入层生效。</string>
+    <string name="root_hide_settings_title">隐藏设置</string>
     <string name="root_hide_hide_root">隐藏 Root</string>
     <string name="root_hide_hide_root_summary">对目标应用隐藏 Root、Magisk、Xposed 等痕迹</string>
     <string name="root_hide_hide_applist">隐藏应用列表</string>

@@ -4,7 +4,7 @@ import android.graphics.SurfaceTexture;
 import android.media.MediaPlayer;
 import android.view.Surface;
 
-import com.kail.location.utils.KailLog;
+import com.kail.location.inject.utils.InjectLog;
 
 import java.io.File;
 import java.util.Map;
@@ -51,10 +51,10 @@ public final class CameraPreviewRenderer {
             mp.setLooping(true);
             applyVolume(mp);
             mp.setOnPreparedListener(p -> {
-                try { p.start(); } catch (Throwable th) { KailLog.INSTANCE.e(null, TAG, "start", th); }
+                try { p.start(); } catch (Throwable th) { InjectLog.e(TAG, "start", th); }
             });
             mp.setOnErrorListener((p, what, extra) -> {
-                KailLog.INSTANCE.e(null, TAG, "MediaPlayer error " + what + "/" + extra);
+                InjectLog.e(TAG, "MediaPlayer error " + what + "/" + extra);
                 return true;
             });
             mp.setOnCompletionListener(p -> {
@@ -63,9 +63,9 @@ public final class CameraPreviewRenderer {
             });
             mp.prepareAsync();
             players.put(st, mp);
-            KailLog.INSTANCE.i(null, TAG, "playInto started: " + videoPath);
+            InjectLog.i(TAG, "playInto started: " + videoPath);
         } catch (Throwable th) {
-            KailLog.INSTANCE.e(null, TAG, "playInto failed", th);
+            InjectLog.e(TAG, "playInto failed", th);
         }
     }
 
@@ -81,18 +81,18 @@ public final class CameraPreviewRenderer {
             mp.setLooping(true);
             applyVolume(mp);
             mp.setOnPreparedListener(p -> {
-                try { p.start(); } catch (Throwable th) { KailLog.INSTANCE.e(null, TAG, "start", th); }
+                try { p.start(); } catch (Throwable th) { InjectLog.e(TAG, "start", th); }
             });
             mp.setOnErrorListener((p, what, extra) -> {
-                KailLog.INSTANCE.e(null, TAG, "MediaPlayer error " + what + "/" + extra);
+                InjectLog.e(TAG, "MediaPlayer error " + what + "/" + extra);
                 return true;
             });
             mp.prepareAsync();
             surfacePlayers.put(surface, mp);
-            KailLog.INSTANCE.i(null, TAG, "playIntoSurface started: " + videoPath);
+            InjectLog.i(TAG, "playIntoSurface started: " + videoPath);
             return true;
         } catch (Throwable th) {
-            KailLog.INSTANCE.e(null, TAG, "playIntoSurface failed", th);
+            InjectLog.e(TAG, "playIntoSurface failed", th);
             return false;
         }
     }
@@ -111,10 +111,10 @@ public final class CameraPreviewRenderer {
             mp.setLooping(false);
             applyVolume(mp);
             mp.setOnPreparedListener(p -> {
-                try { p.start(); } catch (Throwable th) { KailLog.INSTANCE.e(null, TAG, "start", th); }
+                try { p.start(); } catch (Throwable th) { InjectLog.e(TAG, "start", th); }
             });
             mp.setOnErrorListener((p, what, extra) -> {
-                KailLog.INSTANCE.e(null, TAG, "stream MediaPlayer error " + what + "/" + extra);
+                InjectLog.e(TAG, "stream MediaPlayer error " + what + "/" + extra);
                 return true;
             });
             mp.setOnCompletionListener(p -> {
@@ -126,15 +126,15 @@ public final class CameraPreviewRenderer {
                     p.setSurface(surface);
                     p.prepareAsync();
                 } catch (Throwable th) {
-                    KailLog.INSTANCE.e(null, TAG, "stream reconnect", th);
+                    InjectLog.e(TAG, "stream reconnect", th);
                 }
             });
             mp.prepareAsync();
             surfacePlayers.put(surface, mp);
-            KailLog.INSTANCE.i(null, TAG, "playStreamIntoSurface started: " + url);
+            InjectLog.i(TAG, "playStreamIntoSurface started: " + url);
             return true;
         } catch (Throwable th) {
-            KailLog.INSTANCE.e(null, TAG, "playStreamIntoSurface failed", th);
+            InjectLog.e(TAG, "playStreamIntoSurface failed", th);
             return false;
         }
     }
@@ -146,7 +146,7 @@ public final class CameraPreviewRenderer {
             final Surface surface = new Surface(st);
             playStreamIntoSurface(surface, url);
         } catch (Throwable th) {
-            KailLog.INSTANCE.e(null, TAG, "playStreamInto failed", th);
+            InjectLog.e(TAG, "playStreamInto failed", th);
         }
     }
 

@@ -1,8 +1,11 @@
 package com.kail.location.views.roothide
 
 import com.kail.location.utils.GoUtils
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
@@ -12,13 +15,14 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.foundation.shape.RoundedCornerShape
 import com.kail.location.R
 import com.kail.location.viewmodels.RootAppHideViewModel
 import com.kail.location.views.common.AppDrawer
@@ -134,114 +138,122 @@ fun RootAppHideScreen(
                     .verticalScroll(scrollState)
                     .padding(16.dp)
             ) {
-            // Status Card
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(
-                    containerColor = if (isEnabled) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant
-                )
+            // Target card (like Location Simulation)
+            Box(
+                modifier = Modifier.fillMaxWidth()
             ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text(
-                        text = if (isEnabled)
-                            stringResource(R.string.root_hide_status_running)
-                        else
-                            stringResource(R.string.root_hide_status_stopped),
-                        style = MaterialTheme.typography.titleMedium
-                    )
-                    Text(
-                        text = stringResource(R.string.root_hide_desc),
-                        style = MaterialTheme.typography.bodySmall,
-                        modifier = Modifier.padding(top = 4.dp)
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // Hide Root switch
-            OutlinedCard(modifier = Modifier.fillMaxWidth()) {
-                Row(
+                Card(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(16.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                        .padding(top = 16.dp),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
                 ) {
-                    Column(modifier = Modifier.weight(1f)) {
+                    Column(modifier = Modifier.padding(16.dp)) {
                         Text(
-                            text = stringResource(R.string.root_hide_hide_root),
-                            style = MaterialTheme.typography.titleSmall
+                            text = if (isEnabled)
+                                stringResource(R.string.root_hide_status_running)
+                            else
+                                stringResource(R.string.root_hide_status_stopped),
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold
                         )
                         Text(
-                            text = stringResource(R.string.root_hide_hide_root_summary),
-                            style = MaterialTheme.typography.bodySmall,
+                            text = stringResource(R.string.root_hide_settings_title),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.primary,
                             modifier = Modifier.padding(top = 4.dp)
                         )
-                    }
-                    BadgedControl(show = showHelp, number = 2) {
-                        Switch(
-                            checked = hideRoot,
-                            onCheckedChange = { viewModel.setHideRoot(it) }
-                        )
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            // Hide app-list switch
-            OutlinedCard(modifier = Modifier.fillMaxWidth()) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            text = stringResource(R.string.root_hide_hide_applist),
-                            style = MaterialTheme.typography.titleSmall
-                        )
-                        Text(
-                            text = stringResource(R.string.root_hide_hide_applist_summary),
+                            text = stringResource(R.string.root_hide_desc),
                             style = MaterialTheme.typography.bodySmall,
-                            modifier = Modifier.padding(top = 4.dp)
+                            color = Color.Gray,
+                            modifier = Modifier.padding(top = 8.dp)
                         )
-                    }
-                    BadgedControl(show = showHelp, number = 3) {
-                        Switch(
-                            checked = hideAppList,
-                            enabled = hideRoot,
-                            onCheckedChange = { viewModel.setHideAppList(it) }
-                        )
+                        Spacer(modifier = Modifier.height(16.dp))
+
+                        // Two switches side by side (like the joystick switch style)
+                        Row(modifier = Modifier.fillMaxWidth()) {
+                            SwitchCell(
+                                label = stringResource(R.string.root_hide_hide_root),
+                                checked = hideRoot,
+                                enabled = true,
+                                onCheckedChange = { viewModel.setHideRoot(it) },
+                                badge = 3,
+                                showHelp = showHelp,
+                                modifier = Modifier.weight(1f)
+                            )
+                            Spacer(modifier = Modifier.width(12.dp))
+                            SwitchCell(
+                                label = stringResource(R.string.root_hide_hide_applist),
+                                checked = hideAppList,
+                                enabled = hideRoot,
+                                onCheckedChange = { viewModel.setHideAppList(it) },
+                                badge = 4,
+                                showHelp = showHelp,
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(16.dp))
+
+                        // Start/Stop Button
+                        BadgedControl(show = showHelp, number = 6) {
+                            Button(
+                                onClick = {
+                                    if (!isEnabled && !canStart) return@Button
+                                    viewModel.setEnabled(!isEnabled)
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = if (isEnabled) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
+                                ),
+                                enabled = isEnabled || canStart
+                            ) {
+                                Text(
+                                    text = if (isEnabled)
+                                        stringResource(R.string.root_hide_stop)
+                                    else
+                                        stringResource(R.string.root_hide_start)
+                                )
+                            }
+                        }
+
+                        if (!isEnabled && !canStart) {
+                            Text(
+                                text = stringResource(R.string.root_hide_no_apps),
+                                color = MaterialTheme.colorScheme.error,
+                                fontSize = 12.sp,
+                                modifier = Modifier.padding(top = 8.dp)
+                            )
+                        }
                     }
                 }
-            }
 
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // Added apps section header with "+" button
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Text(
-                    text = stringResource(R.string.root_hide_added_apps, selectedPackages.size),
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Bold
-                )
-                BadgedControl(show = showHelp, number = 4) {
-                    SmallFloatingActionButton(
+                // "+" add app button (overlapping top-end, like Location Simulation)
+                BadgedControl(
+                    show = showHelp,
+                    number = 2,
+                    modifier = Modifier.align(Alignment.TopEnd).offset(y = 16.dp)
+                ) {
+                    FloatingActionButton(
                         onClick = { showAppPicker = true },
-                        containerColor = MaterialTheme.colorScheme.secondary
+                        containerColor = MaterialTheme.colorScheme.secondary,
+                        shape = CircleShape,
+                        modifier = Modifier.size(48.dp)
                     ) {
                         Icon(Icons.Default.Add, contentDescription = stringResource(R.string.root_hide_target_apps), tint = Color.White)
                     }
                 }
             }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Added apps header
+            Text(
+                text = stringResource(R.string.root_hide_added_apps, selectedPackages.size),
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Bold
+            )
 
             Spacer(modifier = Modifier.height(8.dp))
 
@@ -295,39 +307,6 @@ fun RootAppHideScreen(
                 }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // Start/Stop Button
-            BadgedControl(show = showHelp, number = 6) {
-                Button(
-                    onClick = {
-                        if (!isEnabled && !canStart) return@Button
-                        viewModel.setEnabled(!isEnabled)
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = if (isEnabled) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
-                    ),
-                    enabled = isEnabled || canStart
-                ) {
-                    Text(
-                        text = if (isEnabled)
-                            stringResource(R.string.root_hide_stop)
-                        else
-                            stringResource(R.string.root_hide_start)
-                    )
-                }
-            }
-
-            if (!isEnabled && !canStart) {
-                Text(
-                    text = stringResource(R.string.root_hide_no_apps),
-                    color = MaterialTheme.colorScheme.error,
-                    fontSize = 12.sp,
-                    modifier = Modifier.padding(top = 8.dp)
-                )
-            }
-
             if (showAppPicker) {
                 AppPickerDialog(
                     selectedPackages = selectedPackages,
@@ -344,14 +323,58 @@ fun RootAppHideScreen(
             showHelp = showHelp,
             entries = listOf(
                 1 to R.string.help_root_hide_menu,
-                2 to R.string.help_root_hide_hide_root_switch,
-                3 to R.string.help_root_hide_hide_applist_switch,
-                4 to R.string.help_root_hide_add_app,
+                2 to R.string.help_root_hide_add_app,
+                3 to R.string.help_root_hide_hide_root_switch,
+                4 to R.string.help_root_hide_hide_applist_switch,
                 5 to R.string.help_root_hide_delete_app,
                 6 to R.string.help_root_hide_start_stop
             ),
             onDismiss = { showHelp = false }
         )
+        }
+    }
+}
+
+/**
+ * 卡片内的开关单元格：上方标签、下方开关，像位置模拟里“摇杆”开关一样。
+ */
+@Composable
+private fun SwitchCell(
+    label: String,
+    checked: Boolean,
+    enabled: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+    badge: Int,
+    showHelp: Boolean,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(12.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 8.dp, vertical = 10.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(
+                text = label,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.primary,
+                fontWeight = FontWeight.Bold,
+                textAlign = TextAlign.Center
+            )
+            BadgedControl(show = showHelp, number = badge) {
+                Switch(
+                    checked = checked,
+                    enabled = enabled,
+                    onCheckedChange = onCheckedChange,
+                    modifier = Modifier.scale(0.85f)
+                )
+            }
         }
     }
 }

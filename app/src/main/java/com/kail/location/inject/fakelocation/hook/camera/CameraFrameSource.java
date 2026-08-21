@@ -5,7 +5,7 @@ import android.media.MediaExtractor;
 import android.media.MediaFormat;
 import android.media.Image;
 
-import com.kail.location.utils.KailLog;
+import com.kail.location.inject.utils.InjectLog;
 
 import java.nio.ByteBuffer;
 import java.util.Arrays;
@@ -146,7 +146,7 @@ public final class CameraFrameSource {
                     }
                 }
                 if (track < 0 || format == null) {
-                    KailLog.INSTANCE.e(null, TAG, "no video track in " + videoPath);
+                    InjectLog.e(TAG, "no video track in " + videoPath);
                     return;
                 }
                 extractor.selectTrack(track);
@@ -192,11 +192,11 @@ public final class CameraFrameSource {
                             break; // restart for looping
                         }
                     } else if (outIdx == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED) {
-                        KailLog.INSTANCE.i(null, TAG, "format changed: " + codec.getOutputFormat());
+                        InjectLog.i(TAG, "format changed: " + codec.getOutputFormat());
                     }
                 }
             } catch (Throwable th) {
-                KailLog.INSTANCE.e(null, TAG, "decodeLoop error", th);
+                InjectLog.e(TAG, "decodeLoop error", th);
                 sleepQuiet(1000);
             } finally {
                 if (codec != null) {
@@ -226,7 +226,7 @@ public final class CameraFrameSource {
             frameWidth = w;
             frameHeight = h;
         } catch (Throwable th) {
-            KailLog.INSTANCE.e(null, TAG, "consumeImage", th);
+            InjectLog.e(TAG, "consumeImage", th);
         }
     }
 
