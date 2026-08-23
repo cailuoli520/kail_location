@@ -35,6 +35,7 @@ import com.kail.location.utils.service.RouteEngine
 import com.kail.location.utils.service.ServiceConstants
 import com.kail.location.utils.service.ServiceNotificationHelper
 import com.kail.location.viewmodels.JoystickViewModel
+import com.kail.location.viewmodels.SettingsViewModel
 import com.kail.location.views.joystick.JoystickWindowManager
 import com.kail.location.views.locationpicker.LocationPickerActivity
 import java.io.BufferedWriter
@@ -1089,12 +1090,21 @@ class ServiceGoRoot : Service() {
         // Fold the native LHooker ArtMethod probe results into THIS diagnostic
         // block (instead of scattering them via separate log lines), and detect
         // whether the inject restarted system_server.
-        diag.recordLoaderTrace(mirrorFakelocInitLog())
+        // 昂贵的诊断镜像（cat /data/system 下的 init/logcat 抓取）各自都要重新起一次
+        // su（约 200ms+），非调试模式下跳过，避免拖慢「开始模拟」的转圈；
+        // crash 检测用的 pgrep 采样与注入状态小文件仍保留。
+        val debugEnabled = PreferenceManager.getDefaultSharedPreferences(this)
+            .getBoolean(SettingsViewModel.KEY_DEBUG_LOG_ENABLED, false)
+        if (debugEnabled) {
+            diag.recordLoaderTrace(mirrorFakelocInitLog())
+            diag.recordNativeProbe(mirrorLHookerInitLog())
+        }
         diag.recordBootstrapState(mirrorInjectDexState())
-        diag.recordNativeProbe(mirrorLHookerInitLog())
         val ssPidAfter = diag.sampleSystemServerPid("注入后")
-        diag.recordInjectedLogcat(mirrorInjectedLogcat(ssPidAfter))
         diag.checkSystemServerStable(ssPidBefore, ssPidAfter)
+        if (debugEnabled) {
+            diag.recordInjectedLogcat(mirrorInjectedLogcat(ssPidAfter))
+        }
 
         // 走到这里说明 app 进程没被注入崩溃带走（system_server 至少还能响应 pgrep）。
         // 撤防哨兵：本次注入没有立即把整机搞崩。
@@ -1161,9 +1171,10 @@ class ServiceGoRoot : Service() {
         // root-mode location path and keep the binder path only as an optional
         // compatibility bridge for WiFi/cell/older ROMs.
         val controlAck = if (injected) runCatching {
-            clearRootLocationAck()
-            writeRootLocationControl(true, generation = generation)
-            waitForRootLocationAck()
+            writeAndWaitRootLocationControl(
+                content = buildRootLocationControlContent(true),
+                generation = generation
+            )
         }.getOrElse {
             KailLog.e(this, TAG, "control-file mock: ${it.message}")
             diag.error("启动控制文件模拟", it)
@@ -1872,22 +1883,37 @@ class ServiceGoRoot : Service() {
         }, delayMs)
     }
 
-    private fun clearRootLocationAck() {
-        ShellUtils.executeCommand("rm -f ${RootControlPaths.ackPath(applicationContext)}")
-    }
-
-    private fun waitForRootLocationAck(timeoutMs: Long = 4000L): RootLocationAck? {
+    /**
+     * 单次 su 会话内完成「清 ack + 写控制文件 + 等 system_server 应用」。
+     *
+     * 旧的启动路径是三次独立命令、各自重新起一个 su 进程（每次 ~200ms）：
+     * clearRootLocationAck() / writeRootLocationControl() / waitForRootLocationAck()
+     * （ack 轮询每 250ms 又 cat 一次）。这里合并成一个 shell 命令，内部 100ms 轮询，
+     * 把启动期的多次 Runtime.exec("su") 压成一次，显著缩短「开始模拟」的转圈时间。
+     * system_server 的 RootLocationControl 线程仍以其自身的 250ms 节奏消费控制文件。
+     *
+     * @return 最终 ack；超时或 ack 为空则返回 null（与旧 waitForRootLocationAck 语义一致）。
+     */
+    private fun writeAndWaitRootLocationControl(content: String, generation: Int): RootLocationAck? {
+        if (!isCurrentGeneration(generation)) return null
+        val controlPath = RootControlPaths.controlPath(applicationContext)
         val ackPath = RootControlPaths.ackPath(applicationContext)
-        val deadline = SystemClock.elapsedRealtime() + timeoutMs
-        while (SystemClock.elapsedRealtime() < deadline) {
-            val raw = ShellUtils.executeCommand("cat $ackPath 2>/dev/null").trim()
-            if (raw.isNotBlank()) {
-                val ack = parseRootLocationAck(raw)
-                if (ack.status != "started") return ack
-            }
-            Thread.sleep(250L)
+        val prepare = if (rootControlPrepared) "" else "mkdir -p $ROOT_RUNTIME_DIR && chmod 777 $ROOT_RUNTIME_DIR && "
+        val cmd = buildString {
+            append("rm -f $ackPath; ")
+            append(prepare)
+            append("printf '%s' ${shellSingleQuote(content)} > $controlPath; ")
+            append("chmod 666 $controlPath 2>/dev/null; chcon u:object_r:system_data_file:s0 $controlPath 2>/dev/null; ")
+            append("i=0; while [ \$i -lt 40 ]; do ")
+            append("  [ -s $ackPath ] && grep -q 'status=applied' $ackPath && { echo __ACK__; cat $ackPath; exit 0; }; ")
+            append("  sleep 0.1; i=\$((i+1)); done; ")
+            append("echo __ACK__; cat $ackPath 2>/dev/null")
         }
-        return null
+        val raw = ShellUtils.executeCommand(cmd, 10_000L).trim()
+        rootControlPrepared = true
+        val payload = raw.substringAfter("__ACK__", raw).trim()
+        if (payload.isBlank()) return null
+        return parseRootLocationAck(payload)
     }
 
     private fun parseRootLocationAck(raw: String): RootLocationAck {

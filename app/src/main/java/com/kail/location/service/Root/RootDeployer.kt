@@ -56,6 +56,12 @@ object RootDeployer {
     private const val ROOT_COPY_TIMEOUT_MS = 30_000L
     private const val ROOT_INJECT_TIMEOUT_MS = 135_000L
 
+    /**
+     * 部署/注入互斥锁：App 启动时的预热注入（KailPreInject）与 ServiceGoRoot 自身的
+     * ensureBaseline( Diagnosed) 可能并发，用同一把锁串行化，避免文件部署/注入互踩。
+     */
+    private val DEPLOY_LOCK = Any()
+
     /** FakeLocation loader/hook libraries packaged in the APK under lib/<abi>/. */
     private val FAKELOC_LIBS = listOf(
         "libfakeloc_init.so",
@@ -75,10 +81,10 @@ object RootDeployer {
      * cpp/root/inject{,64}.cpp) so a hung remote dlopen detaches the tracee
      * cleanly instead of leaving system_server in ptrace_stop.
      */
-    fun ensureBaseline(context: Context): Boolean {
+    fun ensureBaseline(context: Context): Boolean = synchronized(DEPLOY_LOCK) {
         if (!ShellUtils.hasRoot()) {
             KailLog.w(null, TAG, "ensureBaseline: no root; skipping")
-            return false
+            return@synchronized false
         }
 
         // ── 1. 版本化文件缺失或过期 → 全量重部署 ──
@@ -110,14 +116,14 @@ object RootDeployer {
         } else {
             KailLog.i(null, TAG, "ensureBaseline: injection already current; skip ptrace")
         }
-        return true
+        return@synchronized true
     }
 
     /**
      * 带诊断的 ensureBaseline：每一步都记入 [diag]，便于用户排障时一眼定位失败点。
      * 返回是否成功跑完注入引导（不代表 binder 一定就绪，后续由调用方核对）。
      */
-    fun ensureBaselineDiagnosed(context: Context, diag: SimulationDiagnostics): Boolean {
+    fun ensureBaselineDiagnosed(context: Context, diag: SimulationDiagnostics): Boolean = synchronized(DEPLOY_LOCK) {
         val rooted = ShellUtils.hasRoot()
         diag.step(
             "ROOT 权限",
@@ -127,14 +133,14 @@ object RootDeployer {
         )
         if (!rooted) {
             KailLog.w(null, TAG, "ensureBaseline: no root; skipping")
-            return false
+            return@synchronized false
         }
 
         ensureAntiDetectLib(context)
 
         if (isSystemServerInjectionCurrent(context)) {
             diag.step("ptrace 注入 system_server", true, "同一开机/system_server PID 已注入过，跳过部署和重复 ptrace")
-            return true
+            return@synchronized true
         }
 
         runCatching { resetDeployDirs() }
@@ -161,7 +167,7 @@ object RootDeployer {
         }
         if (injected) markSystemServerInjectionCurrent(context)
         diag.step("ptrace 注入 system_server", injected, injectDetail)
-        return injected
+        return@synchronized injected
     }
 
     /** 注入态日志标记目录（与 InjectLog 中的常量保持一致）。 */

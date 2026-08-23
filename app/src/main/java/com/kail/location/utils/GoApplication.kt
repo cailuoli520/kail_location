@@ -134,6 +134,17 @@ class GoApplication : Application(), Application.ActivityLifecycleCallbacks {
             Thread({ InjectionCrashSentinel.checkAndReport(this) }, "KailInjectCrashCheck").start()
         }
 
+        // 预热注入：root 模式下 App 启动早期就在后台完成 system_server 注入，等用户点
+        // 「开始模拟」时注入早已就绪，大幅缩短启动转圈。注入态按 boot+system_server pid
+        // 缓存，同一开机只注入一次；未授权 ROOT 时 ensureBaseline 会快速跳过。
+        runCatching {
+            val runMode = PreferenceManager.getDefaultSharedPreferences(this)
+                .getString("setting_run_mode", "developer") ?: "developer"
+            if (runMode == "root") {
+                Thread({ RootDeployer.ensureBaseline(this) }, "KailPreInject").start()
+            }
+        }
+
         SDKInitializer.setAgreePrivacy(this, true)
         LocationClient.setAgreePrivacy(true)
 
