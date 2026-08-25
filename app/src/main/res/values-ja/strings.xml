@@ -200,6 +200,10 @@
     <string name="nav_sim_end_point">終了：</string>
     <string name="nav_sim_select_start">開始地点を選択してください</string>
     <string name="nav_sim_select_end">終了地点を選択してください</string>
+    <string name="nav_sim_lock_point">この地点をロック（次回も保持）</string>
+    <string name="nav_sim_unlock_point">この地点のロックを解除</string>
+    <string name="nav_sim_use_my_location">現在地に固定（自動更新）</string>
+    <string name="nav_sim_both_locked">開始地点と終了地点は両方固定されています</string>
     <string name="nav_sim_multi_route">複数ルート</string>
     <string name="nav_sim_history_title">履歴データ（最大 10 件）</string>
     <string name="nav_sim_clear">クリア</string>

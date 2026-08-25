@@ -39,6 +39,9 @@ class NavigationSimulationActivity : BaseActivity(), SensorEventListener {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         window.statusBarColor = resources.getColor(R.color.colorPrimary, this.theme)
+        viewModel.currentLocationProvider = {
+            if (currentLocValid()) doubleArrayOf(mCurrentLat, mCurrentLon) else null
+        }
 
         mMapView = MapView(this)
         mMapView?.map?.isMyLocationEnabled = false
@@ -50,9 +53,13 @@ class NavigationSimulationActivity : BaseActivity(), SensorEventListener {
             "Unknown"
         }
 
-        setContent {
-            val runMode by viewModel.runMode.collectAsState()
-            var currentScreen by remember { mutableStateOf(Screen.LIST) }
+         setContent {
+             val runMode by viewModel.runMode.collectAsState()
+             val startLocked by viewModel.startLocked.collectAsState()
+             val endLocked by viewModel.endLocked.collectAsState()
+             val startUseMyLocation by viewModel.startUseMyLocation.collectAsState()
+             val endUseMyLocation by viewModel.endUseMyLocation.collectAsState()
+             var currentScreen by remember { mutableStateOf(Screen.LIST) }
 
             locationTheme {
                 when (currentScreen) {
@@ -140,8 +147,22 @@ class NavigationSimulationActivity : BaseActivity(), SensorEventListener {
                                 startActivity(android.content.Intent(this@NavigationSimulationActivity, com.kail.location.views.xposedsettings.XposedSettingsActivity::class.java))
                             },
                             onPlanRouteClick = {
+                                viewModel.refreshPinnedEndpoints()
                                 mMapView?.map?.clear()
                                 currentScreen = Screen.PLAN
+                            },
+                            onUseCurrentLocation = { isStart ->
+                                if (!currentLocValid()) {
+                                    android.widget.Toast.makeText(this@NavigationSimulationActivity, R.string.history_error_location, android.widget.Toast.LENGTH_SHORT).show()
+                                } else if (isStart) {
+                                    val enabling = !viewModel.startUseMyLocation.value
+                                    viewModel.setStartUseMyLocation(enabling)
+                                    if (enabling) viewModel.setCurrentLocationAsStart(mCurrentLat, mCurrentLon)
+                                } else {
+                                    val enabling = !viewModel.endUseMyLocation.value
+                                    viewModel.setEndUseMyLocation(enabling)
+                                    if (enabling) viewModel.setCurrentLocationAsEnd(mCurrentLat, mCurrentLon)
+                                }
                             }
                         )
                     }
@@ -149,14 +170,14 @@ class NavigationSimulationActivity : BaseActivity(), SensorEventListener {
                         NavigationPlanScreen(
                             mapView = mMapView,
                             onBackClick = { currentScreen = Screen.LIST },
-                            onConfirmClick = { start, end, waits ->
-                                val startName = String.format("%.6f,%.6f", start.latitude, start.longitude)
-                                val endName = String.format("%.6f,%.6f", end.latitude, end.longitude)
-                                viewModel.selectStartPoint(startName, start.latitude, start.longitude)
-                                viewModel.selectEndPoint(endName, end.latitude, end.longitude)
-                                viewModel.setRouteWaits(waits)
-                                currentScreen = Screen.LIST
-                            },
+                             onConfirmClick = { start, end, waits ->
+                                 val startName = String.format("%.6f,%.6f", start.latitude, start.longitude)
+                                 val endName = String.format("%.6f,%.6f", end.latitude, end.longitude)
+                                 viewModel.selectStartPoint(startName, start.latitude, start.longitude)
+                                 viewModel.selectEndPoint(endName, end.latitude, end.longitude)
+                                 viewModel.setRouteWaits(waits)
+                                 currentScreen = Screen.LIST
+                             },
                             viewModel = viewModel,
                             onLocateClick = {
                                 mLocClient?.requestLocation()
@@ -174,7 +195,11 @@ class NavigationSimulationActivity : BaseActivity(), SensorEventListener {
                             initialStart = viewModel.startLatLng.value,
                             initialEnd = viewModel.endLatLng.value,
                             plannedRoutePoints = viewModel.plannedRoute.value,
-                            routeWaits = viewModel.routeWaits.value
+                            routeWaits = viewModel.routeWaits.value,
+                            startLocked = startLocked,
+                            endLocked = endLocked,
+                            startPinned = startUseMyLocation,
+                            endPinned = endUseMyLocation
                         )
                     }
                 }
@@ -225,6 +250,11 @@ class NavigationSimulationActivity : BaseActivity(), SensorEventListener {
         option.setScanSpan(1000)
         mLocClient?.locOption = option
         mLocClient?.start()
+    }
+
+    private fun currentLocValid(): Boolean {
+        return !(Math.abs(mCurrentLat) < 0.000001 && Math.abs(mCurrentLon) < 0.000001) &&
+            mCurrentLat != 4.9E-324 && mCurrentLon != 4.9E-324
     }
 
     override fun onSensorChanged(event: android.hardware.SensorEvent?) {}

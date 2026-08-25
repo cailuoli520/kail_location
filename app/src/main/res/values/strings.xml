@@ -220,6 +220,10 @@
     <string name="nav_sim_end_point">终点:</string>
     <string name="nav_sim_select_start">请选择起点</string>
     <string name="nav_sim_select_end">请选择终点</string>
+    <string name="nav_sim_lock_point">锁定此点，下次规划时保留</string>
+    <string name="nav_sim_unlock_point">解锁此点</string>
+    <string name="nav_sim_use_my_location">固定为当前定位，每次自动更新</string>
+    <string name="nav_sim_both_locked">起点和终点均已固定</string>
     <string name="nav_sim_multi_route">多路线</string>
     <string name="nav_sim_history_title">历史数据 (最多显示10条)</string>
     <string name="nav_sim_clear">清空</string>

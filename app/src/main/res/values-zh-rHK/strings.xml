@@ -200,6 +200,10 @@
     <string name="nav_sim_end_point">終點：</string>
     <string name="nav_sim_select_start">請選擇起點</string>
     <string name="nav_sim_select_end">請選擇終點</string>
+    <string name="nav_sim_lock_point">鎖定此點，下次規劃時保留</string>
+    <string name="nav_sim_unlock_point">解鎖此點</string>
+    <string name="nav_sim_use_my_location">固定為當前定位，每次自動更新</string>
+    <string name="nav_sim_both_locked">起點和終點均已固定</string>
     <string name="nav_sim_multi_route">多條路線</string>
     <string name="nav_sim_history_title">歷史資料（最多顯示 10 筆）</string>
     <string name="nav_sim_clear">清除</string>

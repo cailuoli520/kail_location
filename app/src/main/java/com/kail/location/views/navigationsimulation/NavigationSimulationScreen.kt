@@ -23,6 +23,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Star
@@ -70,10 +71,15 @@ fun NavigationSimulationScreen(
     onRunModeChange: (String) -> Unit,
     onDeveloperModeSelected: () -> Unit = {},
     onXposedSettingsSelected: () -> Unit = {},
-    onPlanRouteClick: () -> Unit = {}
+    onPlanRouteClick: () -> Unit = {},
+    onUseCurrentLocation: (Boolean) -> Unit = {}
 ) {
     val startPoint by viewModel.startPoint.collectAsState()
     val endPoint by viewModel.endPoint.collectAsState()
+    val startLocked by viewModel.startLocked.collectAsState()
+    val endLocked by viewModel.endLocked.collectAsState()
+    val startUseMyLocation by viewModel.startUseMyLocation.collectAsState()
+    val endUseMyLocation by viewModel.endUseMyLocation.collectAsState()
     val isMultiRoute by viewModel.isMultiRoute.collectAsState()
     val historyList by viewModel.historyList.collectAsState()
     val isSimulating by viewModel.isSimulating.collectAsState()
@@ -210,6 +216,13 @@ fun NavigationSimulationScreen(
                                     .padding(vertical = 8.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
+                                NavSimPointActionIcons(
+                                    locked = startLocked,
+                                    pinned = startUseMyLocation,
+                                    lockEnabled = startPoint.isNotEmpty(),
+                                    onToggleLock = { viewModel.toggleStartLocked() },
+                                    onUseCurrentLocation = { onUseCurrentLocation(true) }
+                                )
                                 Text(
                                     text = stringResource(R.string.nav_sim_start_point),
                                     fontWeight = FontWeight.Bold,
@@ -245,6 +258,13 @@ fun NavigationSimulationScreen(
                                     .padding(vertical = 8.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
+                                NavSimPointActionIcons(
+                                    locked = endLocked,
+                                    pinned = endUseMyLocation,
+                                    lockEnabled = endPoint.isNotEmpty(),
+                                    onToggleLock = { viewModel.toggleEndLocked() },
+                                    onUseCurrentLocation = { onUseCurrentLocation(false) }
+                                )
                                 Text(
                                     text = stringResource(R.string.nav_sim_end_point),
                                     fontWeight = FontWeight.Bold,
@@ -804,5 +824,38 @@ fun NavigationHistoryCard(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun NavSimPointActionIcons(
+    locked: Boolean,
+    pinned: Boolean,
+    lockEnabled: Boolean,
+    onToggleLock: () -> Unit,
+    onUseCurrentLocation: () -> Unit
+) {
+    IconButton(
+        onClick = onToggleLock,
+        enabled = lockEnabled,
+        modifier = Modifier.size(32.dp)
+    ) {
+        Icon(
+            painter = painterResource(if (locked) R.drawable.ic_lock_close else R.drawable.ic_lock_open),
+            contentDescription = stringResource(if (locked) R.string.nav_sim_unlock_point else R.string.nav_sim_lock_point),
+            tint = if (locked) Color(0xFF4CAF50) else Color.Gray,
+            modifier = Modifier.size(18.dp)
+        )
+    }
+    IconButton(
+        onClick = onUseCurrentLocation,
+        modifier = Modifier.size(32.dp)
+    ) {
+        Icon(
+            imageVector = Icons.Default.Person,
+            contentDescription = stringResource(R.string.nav_sim_use_my_location),
+            tint = if (pinned) Color(0xFF4CAF50) else MaterialTheme.colorScheme.primary,
+            modifier = Modifier.size(18.dp)
+        )
     }
 }

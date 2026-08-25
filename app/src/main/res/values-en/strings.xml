@@ -223,6 +223,10 @@
     <string name="nav_sim_end_point">End:</string>
     <string name="nav_sim_select_start">Select start point</string>
     <string name="nav_sim_select_end">Select end point</string>
+    <string name="nav_sim_lock_point">Lock this point for next planning</string>
+    <string name="nav_sim_unlock_point">Unlock this point</string>
+    <string name="nav_sim_use_my_location">Pin to my location (auto-updated)</string>
+    <string name="nav_sim_both_locked">Both start and end are fixed</string>
     <string name="nav_sim_multi_route">Multi Route</string>
     <string name="nav_sim_history_title">History (max 10)</string>
     <string name="nav_sim_clear">Clear</string>

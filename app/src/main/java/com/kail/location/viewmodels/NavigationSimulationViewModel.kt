@@ -69,6 +69,18 @@ class NavigationSimulationViewModel(application: Application) : AndroidViewModel
     private val _endLatLng = MutableStateFlow<LatLng?>(null)
     val endLatLng: StateFlow<LatLng?> = _endLatLng.asStateFlow()
 
+    private val _startLocked = MutableStateFlow(false)
+    val startLocked: StateFlow<Boolean> = _startLocked.asStateFlow()
+
+    private val _endLocked = MutableStateFlow(false)
+    val endLocked: StateFlow<Boolean> = _endLocked.asStateFlow()
+
+    private val _startUseMyLocation = MutableStateFlow(false)
+    val startUseMyLocation: StateFlow<Boolean> = _startUseMyLocation.asStateFlow()
+
+    private val _endUseMyLocation = MutableStateFlow(false)
+    val endUseMyLocation: StateFlow<Boolean> = _endUseMyLocation.asStateFlow()
+
     private val _isMultiRoute = MutableStateFlow(false)
     val isMultiRoute: StateFlow<Boolean> = _isMultiRoute.asStateFlow()
 
@@ -135,6 +147,9 @@ class NavigationSimulationViewModel(application: Application) : AndroidViewModel
     val currentLatLng: StateFlow<LatLng?> = _currentLatLng.asStateFlow()
     private var monitorJob: kotlinx.coroutines.Job? = null
 
+    /** 由 Activity 注入：返回当前定位 [lat, lng]，无有效定位时返回 null。 */
+    var currentLocationProvider: (() -> DoubleArray?)? = null
+
     private val statusReceiver = object : android.content.BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
             if (intent?.action == "com.kail.location.service.STATUS_CHANGED") {
@@ -158,10 +173,24 @@ class NavigationSimulationViewModel(application: Application) : AndroidViewModel
         const val POI_ADDRESS = "address"
         const val POI_LATITUDE = "latitude"
         const val POI_LONGITUDE = "longitude"
+
+        private const val KEY_START_NAME = "nav_sim_start_name"
+        private const val KEY_START_LAT = "nav_sim_start_lat"
+        private const val KEY_START_LNG = "nav_sim_start_lng"
+        private const val KEY_END_NAME = "nav_sim_end_name"
+        private const val KEY_END_LAT = "nav_sim_end_lat"
+        private const val KEY_END_LNG = "nav_sim_end_lng"
+        private const val KEY_START_LOCKED = "nav_sim_start_locked"
+        private const val KEY_END_LOCKED = "nav_sim_end_locked"
+        private const val KEY_START_MYLOC = "nav_sim_start_my_location"
+        private const val KEY_END_MYLOC = "nav_sim_end_my_location"
+        private const val KEY_PLANNED_ROUTE = "nav_sim_planned_route"
+        private const val KEY_ROUTE_WAITS = "nav_sim_route_waits"
     }
 
     init {
         loadFavOrders()
+        loadPersistedState()
         viewModelScope.launch {
             historyRepository.recentRoutes.collect { entities ->
                 _historyList.value = entities.map { entity ->
@@ -336,6 +365,60 @@ class NavigationSimulationViewModel(application: Application) : AndroidViewModel
         _endLatLng.value = null
         _plannedRoute.value = null
         _routeWaits.value = emptyMap()
+        _startLocked.value = false
+        _endLocked.value = false
+        _startUseMyLocation.value = false
+        _endUseMyLocation.value = false
+        persistState()
+    }
+
+    fun setStartUseMyLocation(enabled: Boolean) {
+        _startUseMyLocation.value = enabled
+        persistState()
+    }
+
+    fun setEndUseMyLocation(enabled: Boolean) {
+        _endUseMyLocation.value = enabled
+        persistState()
+    }
+
+    fun toggleStartLocked() {
+        if (_startLatLng.value != null) {
+            _startLocked.value = !_startLocked.value
+            persistState()
+        }
+    }
+
+    fun toggleEndLocked() {
+        if (_endLatLng.value != null) {
+            _endLocked.value = !_endLocked.value
+            persistState()
+        }
+    }
+
+    fun setCurrentLocationAsStart(lat: Double, lng: Double) {
+        selectStartPoint(String.format("%.6f,%.6f", lat, lng), lat, lng)
+    }
+
+    fun setCurrentLocationAsEnd(lat: Double, lng: Double) {
+        selectEndPoint(String.format("%.6f,%.6f", lat, lng), lat, lng)
+    }
+
+    /**
+     * 用最新定位静默更新被"人头"固定的端点：只改坐标显示，
+     * 不清除已规划路线/等待点（与手动选点不同）。
+     */
+    fun refreshPinnedEndpoints() {
+        val loc = currentLocationProvider?.invoke() ?: return
+        if (_startUseMyLocation.value) {
+            _startPoint.value = String.format("%.6f,%.6f", loc[0], loc[1])
+            _startLatLng.value = LatLng(loc[0], loc[1])
+        }
+        if (_endUseMyLocation.value) {
+            _endPoint.value = String.format("%.6f,%.6f", loc[0], loc[1])
+            _endLatLng.value = LatLng(loc[0], loc[1])
+        }
+        persistState()
     }
 
     fun selectStartPoint(name: String, lat: Double, lng: Double) {
@@ -347,6 +430,7 @@ class NavigationSimulationViewModel(application: Application) : AndroidViewModel
             _routeWaits.value = emptyMap()
         }
         _searchResults.value = emptyList()
+        persistState()
     }
 
     fun selectEndPoint(name: String, lat: Double, lng: Double) {
@@ -358,11 +442,13 @@ class NavigationSimulationViewModel(application: Application) : AndroidViewModel
             _routeWaits.value = emptyMap()
         }
         _searchResults.value = emptyList()
+        persistState()
     }
 
     /** 设置已规划路线上的等待点（下标 → 秒）。 */
     fun setRouteWaits(waits: Map<Int, Int>) {
         _routeWaits.value = waits
+        persistState()
     }
 
     fun setMultiRoute(enabled: Boolean) {
@@ -372,8 +458,10 @@ class NavigationSimulationViewModel(application: Application) : AndroidViewModel
     /**
      * 第一步：开始规划。用百度驾车路线 API 规划起终点之间的路线，结果放在
      * candidateRoutes 里由界面弹窗展示（标识路线），此时并不开始模拟。
+     * 若某端被"人头"固定为当前定位，这里会先把最新定位填入该端。
      */
     fun planRoute() {
+        refreshPinnedEndpoints()
         val start = _startLatLng.value
         val end = _endLatLng.value
         if (start == null || end == null) return
@@ -381,6 +469,7 @@ class NavigationSimulationViewModel(application: Application) : AndroidViewModel
         _isLoading.value = true
         _plannedRoute.value = null
         _routeWaits.value = emptyMap()
+        persistState()
         val stNode = PlanNode.withLocation(start)
         val enNode = PlanNode.withLocation(end)
 
@@ -400,6 +489,7 @@ class NavigationSimulationViewModel(application: Application) : AndroidViewModel
             _plannedRoute.value = routes[index]
             _candidateRoutes.value = emptyList()
             _isLoading.value = false
+            persistState()
         }
     }
 
@@ -408,6 +498,7 @@ class NavigationSimulationViewModel(application: Application) : AndroidViewModel
         _candidateRoutes.value = emptyList()
         _isLoading.value = false
         _plannedRoute.value = null
+        persistState()
     }
 
     /**
@@ -569,6 +660,92 @@ class NavigationSimulationViewModel(application: Application) : AndroidViewModel
                 map[obj.getLong("id")] = obj.getInt("order")
             }
             _favOrders.value = map
+        } catch (_: Exception) {}
+    }
+
+    private fun persistState() {
+        try {
+            sharedPreferences.edit().apply {
+                putString(KEY_START_NAME, _startPoint.value)
+                val sl = _startLatLng.value
+                if (sl == null) {
+                    remove(KEY_START_LAT)
+                    remove(KEY_START_LNG)
+                } else {
+                    putLong(KEY_START_LAT, sl.latitude.toRawBits())
+                    putLong(KEY_START_LNG, sl.longitude.toRawBits())
+                }
+                putString(KEY_END_NAME, _endPoint.value)
+                val el = _endLatLng.value
+                if (el == null) {
+                    remove(KEY_END_LAT)
+                    remove(KEY_END_LNG)
+                } else {
+                    putLong(KEY_END_LAT, el.latitude.toRawBits())
+                    putLong(KEY_END_LNG, el.longitude.toRawBits())
+                }
+                putBoolean(KEY_START_LOCKED, _startLocked.value)
+                putBoolean(KEY_END_LOCKED, _endLocked.value)
+                putBoolean(KEY_START_MYLOC, _startUseMyLocation.value)
+                putBoolean(KEY_END_MYLOC, _endUseMyLocation.value)
+                val route = _plannedRoute.value
+                if (route == null || route.size < 2) {
+                    remove(KEY_PLANNED_ROUTE)
+                } else {
+                    putString(KEY_PLANNED_ROUTE, route.joinToString(";") { "${it.latitude},${it.longitude}" })
+                }
+                val waits = _routeWaits.value
+                if (waits.isEmpty()) {
+                    remove(KEY_ROUTE_WAITS)
+                } else {
+                    putString(KEY_ROUTE_WAITS, waits.entries.joinToString(";") { "${it.key}:${it.value}" })
+                }
+            }.apply()
+        } catch (_: Exception) {}
+    }
+
+    private fun loadPersistedState() {
+        try {
+            _startPoint.value = sharedPreferences.getString(KEY_START_NAME, "") ?: ""
+            if (sharedPreferences.contains(KEY_START_LAT)) {
+                _startLatLng.value = LatLng(
+                    Double.fromBits(sharedPreferences.getLong(KEY_START_LAT, 0L)),
+                    Double.fromBits(sharedPreferences.getLong(KEY_START_LNG, 0L))
+                )
+            }
+            _endPoint.value = sharedPreferences.getString(KEY_END_NAME, "") ?: ""
+            if (sharedPreferences.contains(KEY_END_LAT)) {
+                _endLatLng.value = LatLng(
+                    Double.fromBits(sharedPreferences.getLong(KEY_END_LAT, 0L)),
+                    Double.fromBits(sharedPreferences.getLong(KEY_END_LNG, 0L))
+                )
+            }
+            _startLocked.value = sharedPreferences.getBoolean(KEY_START_LOCKED, false)
+            _endLocked.value = sharedPreferences.getBoolean(KEY_END_LOCKED, false)
+            _startUseMyLocation.value = sharedPreferences.getBoolean(KEY_START_MYLOC, false)
+            _endUseMyLocation.value = sharedPreferences.getBoolean(KEY_END_MYLOC, false)
+
+            val routeStr = sharedPreferences.getString(KEY_PLANNED_ROUTE, null)
+            if (routeStr != null && _startLatLng.value != null && _endLatLng.value != null) {
+                val pts = routeStr.split(";").mapNotNull { seg ->
+                    val p = seg.split(",")
+                    val la = p.getOrNull(0)?.toDoubleOrNull()
+                    val ln = p.getOrNull(1)?.toDoubleOrNull()
+                    if (la != null && ln != null) LatLng(la, ln) else null
+                }
+                if (pts.size >= 2) _plannedRoute.value = pts
+            }
+            val waitsStr = sharedPreferences.getString(KEY_ROUTE_WAITS, null)
+            if (waitsStr != null) {
+                val map = mutableMapOf<Int, Int>()
+                waitsStr.split(";").forEach { seg ->
+                    val kv = seg.split(":")
+                    val k = kv.getOrNull(0)?.toIntOrNull()
+                    val v = kv.getOrNull(1)?.toIntOrNull()
+                    if (k != null && v != null) map[k] = v
+                }
+                _routeWaits.value = map
+            }
         } catch (_: Exception) {}
     }
 

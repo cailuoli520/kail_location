@@ -68,12 +68,16 @@ fun NavigationPlanScreen(
     initialStart: LatLng? = null,
     initialEnd: LatLng? = null,
     plannedRoutePoints: List<LatLng>? = null,
-    routeWaits: Map<Int, Int> = emptyMap()
+    routeWaits: Map<Int, Int> = emptyMap(),
+    startLocked: Boolean = false,
+    endLocked: Boolean = false,
+    startPinned: Boolean = false,
+    endPinned: Boolean = false
 ) {
     val context = LocalContext.current
     val route = plannedRoutePoints
-    val initialPoints = remember { listOfNotNull(initialStart, initialEnd) }
-    val waypoints = remember { mutableStateListOf<LatLng>().apply { addAll(initialPoints) } }
+    var startPoint by remember { mutableStateOf(initialStart) }
+    var endPoint by remember { mutableStateOf(initialEnd) }
     val waitPoints = remember { mutableStateListOf<LatLng>() }
     val waitSecs = remember { mutableStateListOf<Int>() }
     var startMarkerOverlay by remember { mutableStateOf<Overlay?>(null) }
@@ -86,6 +90,21 @@ fun NavigationPlanScreen(
     var searchQuery by remember { mutableStateOf("") }
     var showHelp by remember { mutableStateOf(false) }
     val searchResults by viewModel.searchResults.collectAsState()
+    val canConfirm = startPoint != null && endPoint != null
+
+    fun tryDrop(center: LatLng): Boolean {
+        when {
+            !startLocked && !startPinned && startPoint == null -> {
+                startPoint = center
+                return true
+            }
+            !endLocked && !endPinned && endPoint == null -> {
+                endPoint = center
+                return true
+            }
+        }
+        return false
+    }
 
     fun nearestIndex(target: LatLng): Int {
         if (route == null || route.isEmpty()) return -1
@@ -120,16 +139,18 @@ fun NavigationPlanScreen(
                 PolylineOptions().width(8).color(AndroidColor.BLUE).points(route)
             )
         }
-        if (waypoints.isNotEmpty()) {
+        val sp = startPoint
+        if (sp != null) {
             val sd = MapUtils.bitmapDescriptorFromVector(context, R.drawable.icon_gcoding, AndroidColor.GREEN)
             if (sd != null) {
-                startMarkerOverlay = map.addOverlay(MarkerOptions().position(waypoints[0]).icon(sd).zIndex(8).draggable(false))
+                startMarkerOverlay = map.addOverlay(MarkerOptions().position(sp).icon(sd).zIndex(8).draggable(false))
             }
         }
-        if (waypoints.size >= 2) {
+        val ep = endPoint
+        if (ep != null) {
             val ed = MapUtils.bitmapDescriptorFromVector(context, R.drawable.icon_gcoding, AndroidColor.RED)
             if (ed != null) {
-                endMarkerOverlay = map.addOverlay(MarkerOptions().position(waypoints[1]).icon(ed).zIndex(8).draggable(false))
+                endMarkerOverlay = map.addOverlay(MarkerOptions().position(ep).icon(ed).zIndex(8).draggable(false))
             }
         }
         // 等待点：蓝色秒数气泡（吸附在蓝色线上），标出等待秒数
@@ -177,7 +198,7 @@ fun NavigationPlanScreen(
         }
     }
 
-    LaunchedEffect(mapView, waypoints.toList(), waitPoints.toList(), waitSecs.toList()) {
+    LaunchedEffect(mapView, startPoint, endPoint, waitPoints.toList(), waitSecs.toList()) {
         redraw()
     }
 
@@ -239,7 +260,7 @@ fun NavigationPlanScreen(
                     .align(Alignment.Center)
                     .size(28.dp),
                 colorFilter = ColorFilter.tint(
-                    if (waypoints.isEmpty()) Color(0xFF4CAF50) else MaterialTheme.colorScheme.primary
+                    if (startPoint == null && endPoint == null) Color(0xFF4CAF50) else MaterialTheme.colorScheme.primary
                 )
             )
 
@@ -268,7 +289,7 @@ fun NavigationPlanScreen(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                // Undo: 先撤等待点，再撤起点/终点
+                // Undo: 先撤等待点，再撤终点/起点（锁定点不可撤）
                 BadgedControl(show = showHelp, number = 6) {
                     SmallFloatingActionButton(
                         onClick = {
@@ -278,13 +299,17 @@ fun NavigationPlanScreen(
                                     waitSecs.removeAt(waitSecs.lastIndex)
                                     redraw()
                                 }
-                                waypoints.isNotEmpty() -> {
-                                    waypoints.removeAt(waypoints.lastIndex)
+                                endPoint != null && !endLocked && !endPinned -> {
+                                    endPoint = null
+                                    redraw()
+                                }
+                                startPoint != null && !startLocked && !startPinned -> {
+                                    startPoint = null
                                     redraw()
                                 }
                             }
                         },
-                        modifier = Modifier.alpha(if (waypoints.isNotEmpty() || waitPoints.isNotEmpty()) 1f else 0f),
+                        modifier = Modifier.alpha(if (startPoint != null || endPoint != null || waitPoints.isNotEmpty()) 1f else 0f),
                         containerColor = Color.White,
                         contentColor = MaterialTheme.colorScheme.primary
                     ) {
@@ -315,15 +340,9 @@ fun NavigationPlanScreen(
                         onClick = {
                             val center = mapView?.map?.mapStatus?.target ?: return@FloatingActionButton
                             when {
-                                waypoints.isEmpty() -> {
-                                    waypoints.add(center)
+                                tryDrop(center) -> {
                                     redraw()
-                                    KailLog.i(context, "NavigationPlanScreen", "start -> $center")
-                                }
-                                waypoints.size == 1 -> {
-                                    waypoints.add(center)
-                                    redraw()
-                                    KailLog.i(context, "NavigationPlanScreen", "end -> $center")
+                                    KailLog.i(context, "NavigationPlanScreen", "point -> $center (start=$startPoint end=$endPoint)")
                                 }
                                 route != null && route.size >= 2 -> {
                                     val idx = nearestIndex(center)
@@ -334,6 +353,8 @@ fun NavigationPlanScreen(
                                         KailLog.i(context, "NavigationPlanScreen", "wait point snapped to route[$idx]")
                                     }
                                 }
+                                (startLocked || startPinned) && (endLocked || endPinned) ->
+                                    android.widget.Toast.makeText(context, R.string.nav_sim_both_locked, android.widget.Toast.LENGTH_SHORT).show()
                             }
                         },
                         containerColor = MaterialTheme.colorScheme.primaryContainer,
@@ -351,22 +372,24 @@ fun NavigationPlanScreen(
                 BadgedControl(show = showHelp, number = 9) {
                     FloatingActionButton(
                         onClick = {
-                            if (waypoints.size >= 2) {
+                            val sp = startPoint
+                            val ep = endPoint
+                            if (sp != null && ep != null) {
                                 val waitsMap = mutableMapOf<Int, Int>()
                                 waitPoints.forEachIndexed { i, p ->
                                     val idx = nearestIndex(p)
                                     if (idx >= 0) waitsMap[idx] = waitSecs[i]
                                 }
-                                onConfirmClick(waypoints[0], waypoints[1], waitsMap)
+                                onConfirmClick(sp, ep, waitsMap)
                             }
                         },
-                        containerColor = if (waypoints.size >= 2) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.surface,
-                        modifier = Modifier.alpha(if (waypoints.size >= 2) 1f else 0.35f)
+                        containerColor = if (canConfirm) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.surface,
+                        modifier = Modifier.alpha(if (canConfirm) 1f else 0.35f)
                     ) {
                         Icon(
                             imageVector = Icons.Default.Check,
                             contentDescription = null,
-                            tint = if (waypoints.size >= 2) Color.White else MaterialTheme.colorScheme.onSurface
+                            tint = if (canConfirm) Color.White else MaterialTheme.colorScheme.onSurface
                         )
                     }
                 }
@@ -418,10 +441,10 @@ fun NavigationPlanScreen(
                                             modifier = Modifier.clickable {
                                                 val lat = item[NavigationSimulationViewModel.POI_LATITUDE] as Double
                                                 val lng = item[NavigationSimulationViewModel.POI_LONGITUDE] as Double
-                                                if (waypoints.size < 2) {
-                                                    waypoints.add(LatLng(lat, lng))
+                                                val pt = LatLng(lat, lng)
+                                                if (tryDrop(pt)) {
                                                     redraw()
-                                                    mapView?.map?.animateMapStatus(MapStatusUpdateFactory.newLatLng(LatLng(lat, lng)))
+                                                    mapView?.map?.animateMapStatus(MapStatusUpdateFactory.newLatLng(pt))
                                                 }
                                                 isSearchActive = false
                                                 searchQuery = ""
