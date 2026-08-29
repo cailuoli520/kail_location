@@ -137,11 +137,27 @@ class GoApplication : Application(), Application.ActivityLifecycleCallbacks {
         // 预热注入：root 模式下 App 启动早期就在后台完成 system_server 注入，等用户点
         // 「开始模拟」时注入早已就绪，大幅缩短启动转圈。注入态按 boot+system_server pid
         // 缓存，同一开机只注入一次；未授权 ROOT 时 ensureBaseline 会快速跳过。
+        //
+        // 开机门控：刚开机 60s 内 system_server 可能尚未就绪（服务/ART 未完全初始化），
+        // 过早 ptrace 注入容易失败甚至挂起（注入器虽有 5s watchdog 兜底）。这里等
+        // elapsedRealtime 满 60s 后再注入；预热若仍失败也不影响后续——点「开始模拟」
+        // 时 ServiceGoRoot 会重新走一遍注入。
         runCatching {
             val runMode = PreferenceManager.getDefaultSharedPreferences(this)
                 .getString("setting_run_mode", "developer") ?: "developer"
             if (runMode == "root") {
-                Thread({ RootDeployer.ensureBaseline(this) }, "KailPreInject").start()
+                Thread({
+                    try {
+                        val minUptimeMs = 60_000L
+                        val elapsedNow = android.os.SystemClock.elapsedRealtime()
+                        if (elapsedNow < minUptimeMs) {
+                            Thread.sleep(minUptimeMs - elapsedNow)
+                        }
+                    } catch (_: InterruptedException) {
+                        return@Thread
+                    }
+                    RootDeployer.ensureBaseline(this)
+                }, "KailPreInject").apply { isDaemon = true }.start()
             }
         }
 

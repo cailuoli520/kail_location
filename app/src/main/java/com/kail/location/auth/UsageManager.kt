@@ -60,7 +60,11 @@ object UsageManager {
         return if (result.isSuccess) {
             val remaining = result.getOrThrow()
             KailLog.i(context, TAG, "canStartSimulation: remaining free count=$remaining")
-            if (remaining <= 0) {
+            if (remaining == -1) {
+                // -1 表示无限次数（服务端补偿开关开启时）
+                KailLog.i(context, TAG, "canStartSimulation=true: unlimited")
+                true
+            } else if (remaining <= 0) {
                 withContext(Dispatchers.Main) {
                     android.widget.Toast.makeText(context, context.getString(R.string.usage_free_exhausted), android.widget.Toast.LENGTH_SHORT).show()
                 }

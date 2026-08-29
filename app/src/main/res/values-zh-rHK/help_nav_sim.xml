@@ -16,4 +16,6 @@
     <string name="help_nav_sim_history_rename">重新命名歷史路線</string>
     <string name="help_nav_sim_history_delete">刪除歷史路線</string>
     <string name="help_nav_sim_history_favorite">收藏 / 取消收藏</string>
+    <string name="help_nav_sim_lock_point">鎖定該點，下次規劃時保留</string>
+    <string name="help_nav_sim_use_my_location">固定使用目前定位，每次自動更新</string>
 </resources>

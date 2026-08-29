@@ -16,7 +16,10 @@ import java.nio.charset.StandardCharsets;
 
 public final class RootLocationControl {
     private static final String TAG = "RootLocationControl";
+    private static final long LOOP_ALIVE_MS = 5000L;
     private static volatile boolean started;
+    private static volatile Thread controlThread;
+    private static volatile long lastLoopMs;
     private static volatile Context context;
     private static volatile String controlPath = RootControlPaths.LEGACY_CONTROL_PATH;
     private static volatile String ackPath = RootControlPaths.LEGACY_ACK_PATH;
@@ -36,14 +39,22 @@ public final class RootLocationControl {
     private RootLocationControl() {
     }
 
-    public static void start(Context appContext) {
+    public static synchronized void start(Context appContext) {
         if (appContext != null) {
             context = appContext;
             controlPath = RootControlPaths.controlPath(appContext);
             ackPath = RootControlPaths.ackPath(appContext);
         }
-        if (started) return;
+        Thread existing = controlThread;
+        if (started && existing != null && existing.isAlive()
+                && System.currentTimeMillis() - lastLoopMs < LOOP_ALIVE_MS) {
+            return;
+        }
+        // 上次线程已退出或卡死（心跳过期）——强制拉起一个新线程，避免一次 apply 死锁
+        // 让注入在本机重启前永久失效（PID 不变，App 侧靠标记会误判"已注入"）。
         started = true;
+        lastModified = 0L;
+        lastLength = 0L;
         Thread thread = new Thread(new Runnable() {
             @Override
             public void run() {
@@ -51,6 +62,7 @@ public final class RootLocationControl {
             }
         }, "KailRootLocationControl");
         thread.setDaemon(true);
+        controlThread = thread;
         thread.start();
         writeAck("started", null, null);
         InjectLog.persist(TAG, "started context=", context, " control=", controlPath);
@@ -59,6 +71,7 @@ public final class RootLocationControl {
     private static void loop() {
         while (true) {
             try {
+                lastLoopMs = System.currentTimeMillis();
                 File file = new File(controlPath);
                 long modified = file.exists() ? file.lastModified() : 0L;
                 long length = file.exists() ? file.length() : 0L;

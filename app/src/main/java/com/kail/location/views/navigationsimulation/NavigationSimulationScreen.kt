@@ -220,6 +220,8 @@ fun NavigationSimulationScreen(
                                     locked = startLocked,
                                     pinned = startUseMyLocation,
                                     lockEnabled = startPoint.isNotEmpty(),
+                                    showHelp = showHelp,
+                                    badgeBase = 17,
                                     onToggleLock = { viewModel.toggleStartLocked() },
                                     onUseCurrentLocation = { onUseCurrentLocation(true) }
                                 )
@@ -262,6 +264,8 @@ fun NavigationSimulationScreen(
                                     locked = endLocked,
                                     pinned = endUseMyLocation,
                                     lockEnabled = endPoint.isNotEmpty(),
+                                    showHelp = showHelp,
+                                    badgeBase = 19,
                                     onToggleLock = { viewModel.toggleEndLocked() },
                                     onUseCurrentLocation = { onUseCurrentLocation(false) }
                                 )
@@ -713,7 +717,11 @@ fun NavigationSimulationScreen(
                 13 to R.string.help_nav_sim_history_select,
                 14 to R.string.help_nav_sim_history_rename,
                 15 to R.string.help_nav_sim_history_delete,
-                16 to R.string.help_nav_sim_history_favorite
+                16 to R.string.help_nav_sim_history_favorite,
+                17 to R.string.help_nav_sim_lock_point,
+                18 to R.string.help_nav_sim_use_my_location,
+                19 to R.string.help_nav_sim_lock_point,
+                20 to R.string.help_nav_sim_use_my_location
             ),
             onDismiss = { showHelp = false }
         )
@@ -832,30 +840,36 @@ private fun NavSimPointActionIcons(
     locked: Boolean,
     pinned: Boolean,
     lockEnabled: Boolean,
+    showHelp: Boolean = false,
+    badgeBase: Int = 0,
     onToggleLock: () -> Unit,
     onUseCurrentLocation: () -> Unit
 ) {
-    IconButton(
-        onClick = onToggleLock,
-        enabled = lockEnabled,
-        modifier = Modifier.size(32.dp)
-    ) {
-        Icon(
-            painter = painterResource(if (locked) R.drawable.ic_lock_close else R.drawable.ic_lock_open),
-            contentDescription = stringResource(if (locked) R.string.nav_sim_unlock_point else R.string.nav_sim_lock_point),
-            tint = if (locked) Color(0xFF4CAF50) else Color.Gray,
-            modifier = Modifier.size(18.dp)
-        )
+    BadgedControl(show = showHelp, number = badgeBase) {
+        IconButton(
+            onClick = onToggleLock,
+            enabled = lockEnabled,
+            modifier = Modifier.size(32.dp)
+        ) {
+            Icon(
+                painter = painterResource(if (locked) R.drawable.ic_lock_close else R.drawable.ic_lock_open),
+                contentDescription = stringResource(if (locked) R.string.nav_sim_unlock_point else R.string.nav_sim_lock_point),
+                tint = if (locked) Color(0xFF4CAF50) else Color.Gray,
+                modifier = Modifier.size(18.dp)
+            )
+        }
     }
-    IconButton(
-        onClick = onUseCurrentLocation,
-        modifier = Modifier.size(32.dp)
-    ) {
-        Icon(
-            imageVector = Icons.Default.Person,
-            contentDescription = stringResource(R.string.nav_sim_use_my_location),
-            tint = if (pinned) Color(0xFF4CAF50) else MaterialTheme.colorScheme.primary,
-            modifier = Modifier.size(18.dp)
-        )
+    BadgedControl(show = showHelp, number = badgeBase + 1) {
+        IconButton(
+            onClick = onUseCurrentLocation,
+            modifier = Modifier.size(32.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Default.Person,
+                contentDescription = stringResource(R.string.nav_sim_use_my_location),
+                tint = if (pinned) Color(0xFF4CAF50) else MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(18.dp)
+            )
+        }
     }
 }

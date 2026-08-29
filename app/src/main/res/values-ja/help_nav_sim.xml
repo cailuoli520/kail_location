@@ -16,4 +16,6 @@
     <string name="help_nav_sim_history_rename">履歴ルートの名前を変更</string>
     <string name="help_nav_sim_history_delete">履歴ルートを削除</string>
     <string name="help_nav_sim_history_favorite">お気に入り登録 / 解除</string>
+    <string name="help_nav_sim_lock_point">この地点をロックし、次のルート計画時も保持</string>
+    <string name="help_nav_sim_use_my_location">現在地に固定し、毎回自動更新</string>
 </resources>

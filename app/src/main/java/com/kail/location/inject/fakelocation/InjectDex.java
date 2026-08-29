@@ -38,6 +38,13 @@ public class InjectDex {
 
     private static Context applicationContext;
 
+    /**
+     * 设置 hook 库的会话路径（由 native 侧 apphook 调用）。
+     * 让 LHooker 的会话携带本次注入的 hooker 库路径，供后续 fork 出的
+     * 应用进程在原生层注入时复用，并落一条持久日志。
+     *
+     * @param libraryPath 当前进程注入所用的 hooker 库文件路径
+     */
     public static void setHookLibraryPath(String libraryPath) {
         LHooker.setSessionLibraryPath(libraryPath);
         com.kail.location.inject.utils.InjectLog.persist("InjectDex", "hook library path=", libraryPath);
@@ -47,6 +54,19 @@ public class InjectDex {
         void onInitialized();
     }
 
+    /**
+     * 应用进程 hook 入口（由 native 侧 libfakeloc_apphook 反射调用）。
+     *
+     * 每次 app 进程启动（fork 后或系统服务启动）都会执行：
+     * 1. 绕过 hidden API 限制；
+     * 2. 按目标进程 ABI 加载对应的 liblhooker(64/x/x64).so；
+     * 3. LHooker 若未初始化则中止；
+     * 4. 暂停所有线程后挂载 hook：com.android.phone 走
+     *    PhoneInterfaceManagerHook，其余应用走 AppProcessHook。
+     *
+     * @param contextObject 进程的 Context（通常为 system_server context）
+     * @return 始终返回 null（native 侧忽略返回值）
+     */
     public static Object[] hookApplication(Object contextObject) {
         String message;
         applicationContext = (Context) contextObject;
@@ -101,6 +121,25 @@ public class InjectDex {
         }
     }
 
+    /**
+     * system_server 内初始化入口（由 native 侧 libfakeloc_init 反射调用）。
+     *
+     * 按顺序完成注入体系的搭建：
+     * 1. 主线程 Handler 就绪并触发初始化回调（{@link #initializeMainThread}）；
+     * 2. 绕过 hidden API 限制；
+     * 3. 按设备 ABI 加载 liblhooker(64/x/x64).so；
+     * 4. 启动 RootLocationControl；
+     * 5. 做包签名校验（com.kail.location / oem_manager / oem_bluetooth）；
+     * 6. 通过 ServiceManagerBridge 向系统注册 oem_location / oem_wifi /
+     *    oem_security / oem_integrity / oem_native 五个 mock 服务；
+     * 7. LHooker 未初始化则中止；否则挂载全 app 的 unified hook；
+     * 8. 启动反检测配置轮询线程（{@link #startAntiDetectConfigPoller}）。
+     *
+     * 每一步的关键事件都会写入 bootstrap 状态文件以便排障。
+     *
+     * @param contextObject system_server 的 Context
+     * @return 始终返回 null
+     */
     public static Object[] init(Object contextObject) {
         Context context = (Context) contextObject;
         applicationContext = context;

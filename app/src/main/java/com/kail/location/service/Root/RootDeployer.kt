@@ -107,14 +107,13 @@ object RootDeployer {
         // ── 1.5 补部署 LAntiDetect 库（不受"已就绪"判断影响）──
         ensureAntiDetectLib(context)
 
-        // ── 2. 注入 — 仅当本次开机尚未注入 system_server ──
-        if (!isSystemServerInjectionCurrent(context)) {
-            KailLog.i(null, TAG, "ensureBaseline: injection not current for this boot; trying ptrace")
+        // ── 2. 注入 — 仅当本次开机注入仍"有效"时才跳过；标记匹配但控制线程已无响应时强制重注入 ──
+        if (isSystemServerInjectionEffective(context)) {
+            KailLog.i(null, TAG, "ensureBaseline: injection already current & control thread alive; skip ptrace")
+        } else {
             runCatching {
                 if (bootstrapInjection(context)) markSystemServerInjectionCurrent(context)
             }.onFailure { KailLog.w(null, TAG, "bootstrapInjection: ${it.message}") }
-        } else {
-            KailLog.i(null, TAG, "ensureBaseline: injection already current; skip ptrace")
         }
         return@synchronized true
     }
@@ -138,10 +137,12 @@ object RootDeployer {
 
         ensureAntiDetectLib(context)
 
-        if (isSystemServerInjectionCurrent(context)) {
+        if (isSystemServerInjectionEffective(context)) {
+            diag.step("system_server 注入活性", true, "控制线程 ack 心跳正常，跳过重新注入")
             diag.step("ptrace 注入 system_server", true, "同一开机/system_server PID 已注入过，跳过部署和重复 ptrace")
             return@synchronized true
         }
+        diag.step("system_server 注入活性", false, "控制线程无响应或注入标记失效，强制重新注入")
 
         runCatching { resetDeployDirs() }
             .onSuccess { diag.step("准备目录", true, "$STAGING_DIR / $FAKELOC_DIR (重置→部署)") }
@@ -821,6 +822,57 @@ object RootDeployer {
             KailLog.i(null, TAG, "injection state stale: state=$state boot=$boot pid=$pid app=$appVersionName")
         }
         return current
+    }
+
+    /**
+     * 注入是否真正"有效"：除了 boot+pid+版本 标记匹配外，还要求注入到 system_server 的
+     * 控制线程（RootLocationControl）确实在响应。长时运行后该线程可能卡死/退出——一次
+     * apply 死锁即可让注入永久失效，但 system_server PID 不变，仅靠标记会误判"已注入"
+     * 而跳过，导致只能重启才能恢复。这里主动探测一次：向控制文件追加一行无害的 probe 键
+     * （线程解析时忽略未知键但会重新读取并回写 ack），观察 ack 的 count/time_ms 是否前进。
+     */
+    private fun isSystemServerInjectionEffective(context: Context): Boolean {
+        if (!isSystemServerInjectionCurrent(context)) return false
+        val alive = isInjectedControlThreadAlive(context)
+        if (!alive) {
+            KailLog.w(null, TAG, "injection marker current but control thread unresponsive — invalidating, will re-inject")
+            invalidateInjectionState()
+        }
+        return alive
+    }
+
+    /** 探测 system_server 内控制线程活性（见 [isSystemServerInjectionEffective] 注释）。 */
+    private fun isInjectedControlThreadAlive(context: Context, timeoutMs: Long = 4000L): Boolean {
+        val controlPath = RootControlPaths.controlPath(context)
+        val ackPath = RootControlPaths.ackPath(context)
+        return runCatching {
+            val before = parseKeyValue(rootCmd("cat $ackPath 2>/dev/null", 1500L))
+            val beforeCount = before["count"]?.toLongOrNull()
+            val beforeTime = before["time_ms"]?.toLongOrNull()
+            // 写一行无害 probe（未知键，线程忽略但会触发重新读取/回写 ack）。
+            val probe = "probe=${System.currentTimeMillis()}\n"
+            rootCmd(
+                "mkdir -p $RUNTIME_DIR && chmod 777 $RUNTIME_DIR && " +
+                    "printf '%s' ${shellQuote(probe)} >> $controlPath && " +
+                    "chmod 666 $controlPath 2>/dev/null || true",
+                1500L
+            )
+            val deadline = System.currentTimeMillis() + timeoutMs
+            while (System.currentTimeMillis() < deadline) {
+                val now = parseKeyValue(rootCmd("cat $ackPath 2>/dev/null", 1500L))
+                val count = now["count"]?.toLongOrNull()
+                val time = now["time_ms"]?.toLongOrNull()
+                val advanced = count != null && (beforeCount == null || count > beforeCount) ||
+                    time != null && (beforeTime == null || time > beforeTime)
+                if (advanced) return true
+                Thread.sleep(200L)
+            }
+            false
+        }.getOrDefault(false)
+    }
+
+    private fun invalidateInjectionState() {
+        rootCmd("rm -f $INJECTION_STATE_FILE 2>/dev/null || true", 1500L)
     }
 
     private fun markSystemServerInjectionCurrent(context: Context) {
