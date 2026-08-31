@@ -59,7 +59,7 @@ class SponsorViewModel(application: Application) : AndroidViewModel(application)
         selectedPlanId = planId
     }
 
-    private fun createCheckoutUrl(onUrl: (String) -> Unit) {
+    private fun createCheckoutUrl(onResult: (checkoutUrl: String, sessionId: String?) -> Unit) {
         val token = AuthManager.token ?: run { checkoutError = getApplication<Application>().getString(R.string.sponsor_error_not_logged_in); return }
         val planId = selectedPlanId ?: run { checkoutError = getApplication<Application>().getString(R.string.sponsor_error_select_plan); return }
 
@@ -83,14 +83,15 @@ class SponsorViewModel(application: Application) : AndroidViewModel(application)
                     val body = response.body?.string() ?: ""
                     val root = JSONObject(body)
                     if (root.optInt("code", -1) == 0) {
-                        root.getJSONObject("data").getString("checkoutUrl")
+                        val data = root.getJSONObject("data")
+                        data.getString("checkoutUrl") to data.optString("sessionId", "")
                     } else {
                         throw Exception(root.optString("msg", errorCreateCheckout))
                     }
                 }
             }
             result.fold(
-                onSuccess = { url -> onUrl(url) },
+                onSuccess = { (url, sessionId) -> onResult(url, sessionId) },
                 onFailure = { error ->
                     KailLog.w(null, TAG, "createCheckoutUrl: create checkout failed: ${error.message}")
                     checkoutError = error.message
@@ -100,10 +101,10 @@ class SponsorViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
-    fun createCheckout(onUrl: (String) -> Unit) { createCheckoutUrl(onUrl) }
+    fun createCheckout(onResult: (checkoutUrl: String, sessionId: String?) -> Unit) { createCheckoutUrl(onResult) }
     fun createWechatCheckout() {
         wechatPayUrl = null
-        createCheckoutUrl { url -> wechatPayUrl = url }
+        createCheckoutUrl { url, _ -> wechatPayUrl = url }
     }
 
     fun checkSubscriptionStatus() {

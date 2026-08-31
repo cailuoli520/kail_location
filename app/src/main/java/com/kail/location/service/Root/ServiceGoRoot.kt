@@ -1904,12 +1904,14 @@ class ServiceGoRoot : Service() {
             append(prepare)
             append("printf '%s' ${shellSingleQuote(content)} > $controlPath; ")
             append("chmod 666 $controlPath 2>/dev/null; chcon u:object_r:system_data_file:s0 $controlPath 2>/dev/null; ")
-            append("i=0; while [ \$i -lt 40 ]; do ")
+            // 长时运行后 system_server 内的 apply（向各已注册位置监听器派发模拟位置）可能
+            // 被冻结/僵尸监听器拖慢数秒，等待窗口给足 12s，避免 4s 上限误报"注入失效"。
+            append("i=0; while [ \$i -lt 120 ]; do ")
             append("  [ -s $ackPath ] && grep -q 'status=applied' $ackPath && { echo __ACK__; cat $ackPath; exit 0; }; ")
             append("  sleep 0.1; i=\$((i+1)); done; ")
             append("echo __ACK__; cat $ackPath 2>/dev/null")
         }
-        val raw = ShellUtils.executeCommand(cmd, 10_000L).trim()
+        val raw = ShellUtils.executeCommand(cmd, 20_000L).trim()
         rootControlPrepared = true
         val payload = raw.substringAfter("__ACK__", raw).trim()
         if (payload.isBlank()) return null

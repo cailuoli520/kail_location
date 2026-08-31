@@ -826,48 +826,74 @@ object RootDeployer {
 
     /**
      * 注入是否真正"有效"：除了 boot+pid+版本 标记匹配外，还要求注入到 system_server 的
-     * 控制线程（RootLocationControl）确实在响应。长时运行后该线程可能卡死/退出——一次
-     * apply 死锁即可让注入永久失效，但 system_server PID 不变，仅靠标记会误判"已注入"
-     * 而跳过，导致只能重启才能恢复。这里主动探测一次：向控制文件追加一行无害的 probe 键
-     * （线程解析时忽略未知键但会重新读取并回写 ack），观察 ack 的 count/time_ms 是否前进。
+     * 控制线程（RootLocationControl）确实能完整执行"启用模拟"的 apply 路径。长时运行后
+     * 该线程可能卡死/退出——一次 apply 死锁即可让注入永久失效，但 system_server PID 不变，
+     * 仅靠标记会误判"已注入"而跳过，导致只能重启才能恢复。这里主动探测一次：写入
+     * enabled=1 的全量控制内容，等控制线程真正走完 apply（含 MockLocationHookManager/
+     * dispatch loop 路径）并回写 status=applied，然后再把原控制内容写回。
+     * 注意：必须探测 enable 全路径——只探测"读文件回写 ack"的轻路径会误判：线程活着
+     * 但 enable 路径卡死时，轻路径（enabled=0 快路径）必然通过。
      */
     private fun isSystemServerInjectionEffective(context: Context): Boolean {
         if (!isSystemServerInjectionCurrent(context)) return false
         val alive = isInjectedControlThreadAlive(context)
         if (!alive) {
-            KailLog.w(null, TAG, "injection marker current but control thread unresponsive — invalidating, will re-inject")
+            KailLog.w(null, TAG, "injection marker current but control thread cannot apply enable — invalidating, will re-inject")
             invalidateInjectionState()
         }
         return alive
     }
 
-    /** 探测 system_server 内控制线程活性（见 [isSystemServerInjectionEffective] 注释）。 */
-    private fun isInjectedControlThreadAlive(context: Context, timeoutMs: Long = 4000L): Boolean {
+    /**
+     * 探测 system_server 内控制线程能否真正启用模拟（见 [isSystemServerInjectionEffective]）。
+     * 用备份恢复原控制文件内容，避免探测本身留下副作用。
+     */
+    private fun isInjectedControlThreadAlive(context: Context, timeoutMs: Long = 10_000L): Boolean {
         val controlPath = RootControlPaths.controlPath(context)
         val ackPath = RootControlPaths.ackPath(context)
         return runCatching {
-            val before = parseKeyValue(rootCmd("cat $ackPath 2>/dev/null", 1500L))
-            val beforeCount = before["count"]?.toLongOrNull()
-            val beforeTime = before["time_ms"]?.toLongOrNull()
-            // 写一行无害 probe（未知键，线程忽略但会触发重新读取/回写 ack）。
-            val probe = "probe=${System.currentTimeMillis()}\n"
+            val snapshot = rootCmd("cat $controlPath 2>/dev/null", 1500L)
+            val probeContent = "enabled=1\n" +
+                "lat=0.0\n" +
+                "lng=0.0\n" +
+                "alt=55.0\n" +
+                "bearing=0.0\n" +
+                "speed=0.0\n" +
+                "interval=1000\n" +
+                "step_enabled=0\n" +
+                "step_spm=120.0\n" +
+                "step_mode=0\n" +
+                "step_scheme=0\n"
             rootCmd(
-                "mkdir -p $RUNTIME_DIR && chmod 777 $RUNTIME_DIR && " +
-                    "printf '%s' ${shellQuote(probe)} >> $controlPath && " +
+                "rm -f $ackPath; " +
+                    "mkdir -p $RUNTIME_DIR && chmod 777 $RUNTIME_DIR && " +
+                    "printf '%s' ${shellQuote(probeContent)} > $controlPath && " +
                     "chmod 666 $controlPath 2>/dev/null || true",
                 1500L
             )
             val deadline = System.currentTimeMillis() + timeoutMs
+            var alive = false
             while (System.currentTimeMillis() < deadline) {
-                val now = parseKeyValue(rootCmd("cat $ackPath 2>/dev/null", 1500L))
-                val count = now["count"]?.toLongOrNull()
-                val time = now["time_ms"]?.toLongOrNull()
-                val advanced = count != null && (beforeCount == null || count > beforeCount) ||
-                    time != null && (beforeTime == null || time > beforeTime)
-                if (advanced) return true
-                Thread.sleep(200L)
+                val ack = parseKeyValue(rootCmd("cat $ackPath 2>/dev/null", 1500L))
+                when (ack["status"]) {
+                    "applied" -> {
+                        alive = true
+                        break
+                    }
+                    "error" -> break
+                }
+                Thread.sleep(250L)
             }
-            false
+            // 恢复原控制内容（快照为空则删掉探测文件，避免遗留 enabled=1）。
+            if (snapshot.isNotBlank()) {
+                rootCmd(
+                    "printf '%s' ${shellQuote(snapshot)} > $controlPath && chmod 666 $controlPath 2>/dev/null || true",
+                    1500L
+                )
+            } else {
+                rootCmd("rm -f $controlPath 2>/dev/null || true", 1500L)
+            }
+            alive
         }.getOrDefault(false)
     }
 

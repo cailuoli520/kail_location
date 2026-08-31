@@ -2,38 +2,69 @@ package com.kail.location.views.sponsor
 
 import android.annotation.SuppressLint
 import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.os.Bundle
+import android.util.Base64
 import android.util.Log
-import android.webkit.CookieManager
+import android.widget.Toast
 import android.webkit.WebChromeClient
-import android.webkit.WebResourceRequest
-import android.webkit.WebResourceResponse
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.activity.compose.setContent
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.lifecycle.lifecycleScope
 import com.kail.location.R
+import com.kail.location.auth.AuthManager
+import com.kail.location.network.RuoYiClient
+import com.kail.location.utils.KailLog
 import com.kail.location.views.base.BaseActivity
 import com.kail.location.views.theme.locationTheme
-import java.io.ByteArrayInputStream
-import java.net.HttpURLConnection
-import java.net.URL
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import okhttp3.Request
+import org.json.JSONObject
+import com.google.zxing.BarcodeFormat
+import com.google.zxing.MultiFormatWriter
+import com.google.zxing.common.BitMatrix
+import android.graphics.Color as AndroidColor
 
+/**
+ * 收银台 WebView（Paddle/Stripe）。
+ *
+ * Stripe 微信支付二维码在 Android WebView 内无法渲染，因此：
+ * WebView 仅用于展示结算页/发起支付；支付意图确认后由本类轮询后端 stripe-qrcode
+ * 接口拿到二维码图片，用原生 Dialog 展示，并提供"微信内打开"按钮（weixin://）唤起微信。
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 class CheckoutWebViewActivity : BaseActivity() {
 
     companion object {
         const val EXTRA_URL = "checkout_url"
+        const val EXTRA_SESSION_ID = "checkout_session_id"
         private const val TAG = "CheckoutWebView"
     }
+
+    private var qrCodeImage by mutableStateOf<String?>(null)
+    private var wechatUrl by mutableStateOf<String?>(null)
+    private var sessionId: String = ""
+    private var polling = false
 
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -42,6 +73,7 @@ class CheckoutWebViewActivity : BaseActivity() {
             finish()
             return
         }
+        sessionId = intent.getStringExtra(EXTRA_SESSION_ID) ?: ""
 
         setContent {
             locationTheme {
@@ -78,8 +110,6 @@ class CheckoutWebViewActivity : BaseActivity() {
                                 settings.builtInZoomControls = true
                                 settings.displayZoomControls = false
 
-                                val desktopUA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36"
-
                                 webChromeClient = object : WebChromeClient() {
                                     override fun onConsoleMessage(message: String, lineNumber: Int, sourceID: String) {
                                         Log.d(TAG, "$sourceID:$lineNumber: $message")
@@ -87,55 +117,13 @@ class CheckoutWebViewActivity : BaseActivity() {
                                 }
 
                                 webViewClient = object : WebViewClient() {
-                                    override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest): WebResourceResponse? {
-                                        if (request.isForMainFrame) return null
-                                        val urlStr = request.url.toString()
-                                        if (!urlStr.contains("buy.paddle.com") && !urlStr.contains("paddlejs")) return null
-                                        Log.d(TAG, "intercept: ${urlStr.take(120)}...")
-                                        return try {
-                                            val conn = URL(urlStr).openConnection() as HttpURLConnection
-                                            conn.instanceFollowRedirects = true
-                                            conn.connectTimeout = 15000
-                                            conn.readTimeout = 15000
-                                            conn.setRequestProperty("User-Agent", desktopUA)
-                                            for ((key, value) in request.requestHeaders) conn.setRequestProperty(key, value)
-                                            conn.connect()
-
-                                            val contentType = conn.contentType ?: "text/plain"
-                                            if (!contentType.contains("html")) {
-                                                Log.d(TAG, "skip non-html: $contentType")
-                                                return null
-                                            }
-
-                                            val html = conn.inputStream.bufferedReader().readText()
-                                            if (!html.contains("<head>")) {
-                                                Log.d(TAG, "skip no head tag")
-                                                return null
-                                            }
-
-                                            val injected = """
-                                                <script>
-                                                (function(){
-                                                    try{Object.defineProperty(Navigator.prototype,'maxTouchPoints',{get:function(){return 0}})}catch(e){}
-                                                    try{Object.defineProperty(Navigator.prototype,'platform',{get:function(){return 'Win32'}})}catch(e){}
-                                                })();
-                                                </script>
-                                            """.trimIndent()
-                                            val modified = html.replace("<head>", "<head>$injected")
-                                            Log.d(TAG, "injected OK: ${html.length} -> ${modified.length}")
-                                            WebResourceResponse(contentType, "utf-8", ByteArrayInputStream(modified.toByteArray(Charsets.UTF_8)))
-                                        } catch (e: Exception) {
-                                            Log.w(TAG, "intercept error: ${e.message}")
-                                            null
-                                        }
-                                    }
-
                                     override fun onPageStarted(view: WebView, url: String, favicon: Bitmap?) {
                                         super.onPageStarted(view, url, favicon)
                                         Log.d(TAG, "onPageStarted: ${url.take(100)}")
                                     }
 
                                     override fun onPageFinished(view: WebView, url: String) {
+                                        super.onPageFinished(view, url)
                                         Log.d(TAG, "onPageFinished: ${url.take(100)}")
                                     }
                                 }
@@ -145,7 +133,145 @@ class CheckoutWebViewActivity : BaseActivity() {
                         }
                     )
                 }
+
+                // 原生二维码弹窗（可关闭，深色/浅色自适应，二维码固定白底保证可扫）
+                qrCodeImage?.let { qrImage ->
+                    AlertDialog(
+                        onDismissRequest = { qrCodeImage = null },
+                        title = {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text("微信支付", modifier = Modifier.weight(1f))
+                                IconButton(onClick = { qrCodeImage = null }) {
+                                    Icon(Icons.Default.Close, contentDescription = "关闭")
+                                }
+                            }
+                        },
+                        text = {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
+                                val bitmap = try {
+                                    // 优先用 weixin:// 链接本地生成高清二维码（Stripe 返回的 image_data_url 分辨率极低）
+                                    val fromWx = wechatUrl?.let { generateQrBitmap(it, 512) }
+                                    if (fromWx != null) {
+                                        fromWx
+                                    } else {
+                                        val clean = qrImage.removePrefix("data:image/png;base64,").removePrefix("data:image/jpeg;base64,")
+                                        val bytes = Base64.decode(clean, Base64.DEFAULT)
+                                        BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+                                    }
+                                } catch (e: Exception) { null }
+                                if (bitmap != null) {
+                                    // 固定白色背景：深色模式下二维码区仍是白底黑码，保证可识别
+                                    Box(
+                                        modifier = Modifier
+                                            .background(Color.White, RoundedCornerShape(8.dp))
+                                            .padding(10.dp)
+                                    ) {
+                                        Image(
+                                            bitmap = bitmap.asImageBitmap(),
+                                            contentDescription = "微信支付二维码",
+                                            modifier = Modifier.size(220.dp)
+                                        )
+                                    }
+                                }
+                                Text("请使用微信扫描二维码支付", modifier = Modifier.padding(top = 10.dp))
+                            }
+                        },
+                        confirmButton = {},
+                    )
+                }
             }
         }
+
+        // 轮询二维码
+        if (sessionId.isNotEmpty()) {
+            startQrCodePolling(sessionId)
+        }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        if (sessionId.isNotEmpty()) {
+            startQrCodePolling(sessionId)
+        }
+
+    }
+
+    private fun startQrCodePolling(sessionId: String) {
+        if (polling) return
+        polling = true
+        val token = AuthManager.token ?: return
+        lifecycleScope.launch {
+            try {
+                while (isActive) {
+                    try {
+                        val (qrImage, wxUrl, status) = withContext(Dispatchers.IO) {
+                            fetchStripeQrCode(token, sessionId)
+                        }
+                        when (status) {
+                            "requires_action" -> {
+                                qrCodeImage = qrImage
+                                wechatUrl = wxUrl
+                            }
+                            "succeeded" -> {
+                                Toast.makeText(this@CheckoutWebViewActivity, "支付成功", Toast.LENGTH_SHORT).show()
+                                delay(600)
+                                finish()
+                                return@launch
+                            }
+                            "canceled", "failed", "processing" -> delay(3000)
+                            else -> delay(2500)
+                        }
+                    } catch (e: Exception) {
+                        KailLog.w(null, TAG, "poll qr code error: ${e.message}")
+                        delay(3000)
+                    }
+                }
+            } finally {
+                polling = false
+            }
+        }
+    }
+
+    /**
+     * 用 ZXing 本地生成高清二维码（替代 Stripe 低分辨率 image_data_url）
+     */
+    private fun generateQrBitmap(content: String, size: Int): Bitmap? {
+        return try {
+            val matrix: BitMatrix = MultiFormatWriter().encode(content, BarcodeFormat.QR_CODE, size, size)
+            val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.RGB_565)
+            for (x in 0 until size) {
+                for (y in 0 until size) {
+                    bitmap.setPixel(x, y, if (matrix[x, y]) AndroidColor.BLACK else AndroidColor.WHITE)
+                }
+            }
+            bitmap
+        } catch (e: Exception) {
+            KailLog.w(null, TAG, "generateQrBitmap failed: ${e.message}")
+            null
+        }
+    }
+
+    private fun fetchStripeQrCode(token: String, sessionId: String): Triple<String?, String?, String> {        val url = "${RuoYiClient.baseUrl}/member/subscription/stripe-qrcode?sessionId=$sessionId"
+        val request = Request.Builder()
+            .url(url)
+            .get()
+            .header("Authorization", "Bearer $token")
+            .header("tenant-id", "1")
+            .build()
+        val response = RuoYiClient.okHttpClient.newCall(request).execute()
+        val body = response.body?.string() ?: ""
+        val root = JSONObject(body)
+        if (root.optInt("code", -1) != 0) {
+            throw Exception(root.optString("msg", "query failed"))
+        }
+        val data = root.getJSONObject("data")
+        return Triple(
+            data.optString("qrCodeImage", "").ifEmpty { null },
+            data.optString("wechatUrl", "").ifEmpty { null },
+            data.optString("status", "pending")
+        )
     }
 }

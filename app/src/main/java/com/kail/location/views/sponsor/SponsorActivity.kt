@@ -20,10 +20,11 @@ class SponsorActivity : BaseActivity() {
                 SponsorScreen(
                     onBackClick = { finish() },
                     onCreateCheckout = {
-                        viewModel.createCheckout { url ->
+                        viewModel.createCheckout { url, sessionId ->
                             if (url.isNotEmpty()) {
                                 val intent = Intent(this, CheckoutWebViewActivity::class.java).apply {
                                     putExtra(CheckoutWebViewActivity.EXTRA_URL, url)
+                                    putExtra(CheckoutWebViewActivity.EXTRA_SESSION_ID, sessionId ?: "")
                                 }
                                 startActivity(intent)
                             }

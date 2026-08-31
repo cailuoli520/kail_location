@@ -17,9 +17,13 @@ import java.nio.charset.StandardCharsets;
 public final class RootLocationControl {
     private static final String TAG = "RootLocationControl";
     private static final long LOOP_ALIVE_MS = 5000L;
+    private static final long APPLY_ABANDON_MS = 20_000L;
     private static volatile boolean started;
     private static volatile Thread controlThread;
     private static volatile long lastLoopMs;
+    private static volatile Thread applyWorker;
+    private static volatile long applyWorkerTickedMs;
+    private static volatile File pendingApplyFile;
     private static volatile Context context;
     private static volatile String controlPath = RootControlPaths.LEGACY_CONTROL_PATH;
     private static volatile String ackPath = RootControlPaths.LEGACY_ACK_PATH;
@@ -78,7 +82,7 @@ public final class RootLocationControl {
                 if (modified != lastModified || length != lastLength) {
                     lastModified = modified;
                     lastLength = length;
-                    apply(file);
+                    scheduleApply(file);
                 }
                 refreshStepAckIfNeeded();
                 Thread.sleep(250L);
@@ -91,6 +95,47 @@ public final class RootLocationControl {
                 }
             }
         }
+    }
+
+    /**
+     * 在独立 worker 线程上执行 apply()。长时运行后向已注册（可能已冻结/僵尸）的
+     * 位置监听器派发模拟位置会阻塞数秒甚至更长；如果直接在控制循环线程里 apply()，
+     * 整个循环会被拖死，probe/ack 全部失联（表现为"过一段时间后注入失效"）。
+     * worker 若超过 [APPLY_ABANDON_MS] 没有推进（apply 内层卡死），下一次
+     * scheduleApply 直接放弃旧 worker 另起新的，控制循环保持可用。
+     */
+    private static synchronized void scheduleApply(File file) {
+        pendingApplyFile = file;
+        Thread worker = applyWorker;
+        long now = System.currentTimeMillis();
+        if (worker != null && worker.isAlive() && now - applyWorkerTickedMs < APPLY_ABANDON_MS) {
+            return;
+        }
+        // 旧 worker 已死或卡死（超时无心跳）——放弃它，另起一个处理最新文件。
+        applyWorkerTickedMs = now;
+        Thread t = new Thread(new Runnable() {
+            @Override
+            public void run() {
+                while (true) {
+                    File f;
+                    synchronized (RootLocationControl.class) {
+                        f = pendingApplyFile;
+                        pendingApplyFile = null;
+                        if (f == null) return;
+                        applyWorkerTickedMs = System.currentTimeMillis();
+                    }
+                    try {
+                        apply(f);
+                    } catch (Throwable t2) {
+                        InjectLog.e(TAG, "apply error", t2);
+                        writeAck("error", null, t2.toString());
+                    }
+                }
+            }
+        }, "KailRootLocationApply");
+        t.setDaemon(true);
+        applyWorker = t;
+        t.start();
     }
 
     private static void apply(File file) throws Exception {
