@@ -26,16 +26,33 @@ import java.util.List;
 import com.kail.location.inject.fakelocation.hook.phone.PhoneInterfaceManagerHook;
 import com.kail.location.inject.fakelocation.hook.app.AppProcessHook;
 
+/**
+ * 注入体系在 Java 层的总入口（Dex 版）。
+ *
+ * native 侧 libfakeloc 系列库反射调用本类的三个静态入口：
+ *   - libfakeloc_initzygote -> {@link #initZygote(Object)}（zygote 进程）
+ *   - libfakeloc_init       -> {@link #init(Object)}（system_server）
+ *   - libfakeloc_apphook    -> {@link #hookApplication(Object)}（各 app 进程）
+ *
+ * 职责：绕过 hidden API -> 按 ABI 加载 liblhooker.so -> 挂载对应的 hook 链，
+ * 并把产生的 mock 服务（模拟定位/模拟 WiFi/反检测/隐藏 Root/原生捕获）
+ * 注册进进程的 ServiceManager。
+ */
 public class InjectDex {
 
+    /** bootstrap 状态文件路径：记录注入每个阶段的进度，供 root 侧排障。 */
     private static final String BOOTSTRAP_STATE_PATH = "/data/system/kail-loc/injectdex_state.txt";
 
+    /** 当前已成功挂载的 hook 集合（线程安全，供调试/上层查询）。 */
     public static List<?> activeHooks = Collections.synchronizedList(new ArrayList());
 
+    /** 初始化回调列表：handler/主线程就绪后依次回调 onInitialized()。 */
     static List<InitializationCallback> initializationCallbacks = Collections.synchronizedList(new ArrayList());
 
+    /** 主线程 Handler（在 {@link #initializeMainThread} 中创建）。 */
     private static Handler mainHandler;
 
+    /** 全局 application Context（在 {@link #init} / {@link #hookApplication} 时赋值）。 */
     private static Context applicationContext;
 
     /**
@@ -50,6 +67,9 @@ public class InjectDex {
         com.kail.location.inject.utils.InjectLog.persist("InjectDex", "hook library path=", libraryPath);
     }
 
+    /**
+     * 初始化回调接口：当主线程 Handler 就绪时被逐一触发。
+     */
     public interface InitializationCallback {
         void onInitialized();
     }
@@ -57,7 +77,7 @@ public class InjectDex {
     /**
      * 应用进程 hook 入口（由 native 侧 libfakeloc_apphook 反射调用）。
      *
-     * 每次 app 进程启动（fork 后或系统服务启动）都会执行：
+     * 每个 app 进程启动（fork 后或服务进程创建）都会执行：
      * 1. 绕过 hidden API 限制；
      * 2. 按目标进程 ABI 加载对应的 liblhooker(64/x/x64).so；
      * 3. LHooker 若未初始化则中止；
@@ -195,6 +215,18 @@ public class InjectDex {
         }
     }
 
+    /**
+     * zygote 入口（由 native 侧 libfakeloc_initzygote 反射调用）。
+     *
+     * zygote 里没有 Activity 上下文，这里只做最轻量的准备：
+     * 1. 绕过 hidden API 限制；
+     * 2. 按设备 ABI 加载 liblhooker(64/x/x64).so（32/64 位兼容时分别加载）；
+     * 3. 把 AppProcessHook 挂到系统 ClassLoader 上——这样之后 fork 出来的
+     *    所有应用进程都自动继承 hook 链（后续 dp_*_hook 覆盖各别 app）。
+     *
+     * @param startupParam native 传入的启动参数（当前未使用）
+     * @return 始终返回 null
+     */
     public static Object[] initZygote(Object startupParam) {
         String libraryPath;
         String processLibraryPath;
@@ -220,6 +252,12 @@ public class InjectDex {
         return null;
     }
 
+    /**
+     * 获取注入体系持有的全局 application Context
+     * （在 {@link #init} / {@link #hookApplication} 时被赋值）。
+     *
+     * @return 当前进程的 Context，未初始化时为 null
+     */
     public static Context getApplicationContext() {
         return applicationContext;
     }
@@ -275,10 +313,21 @@ public class InjectDex {
         t.start();
     }
 
+    /**
+     * DEBUG 级日志的本地封装。
+     *
+     * @param message 要写入 logcat 的消息
+     */
     static void log(String message) {
         com.kail.location.inject.utils.InjectLog.d("InjectDex", message);
     }
 
+    /**
+     * 初始化主线程 Handler，并依次触发所有已注册的初始化回调。
+     * 回调异常仅打印堆栈，不中断后续回调执行。
+     *
+     * @param context 用于获取主线程 Looper 的 Context
+     */
     private static void initializeMainThread(Context context) {
         mainHandler = new Handler(context.getMainLooper());
         Iterator<InitializationCallback> iterator = initializationCallbacks.iterator();
@@ -291,6 +340,14 @@ public class InjectDex {
         }
     }
 
+    /**
+     * 把当前注入阶段的事件追加写入 /data/system/kail-loc/injectdex_state.txt
+     * （root 侧可读，用于诊断注入进度）。
+     * 不要求写入者的宿主进程拥有权限；失败时静默忽略。
+     *
+     * @param event 该阶段的事件描述（如 "hidden_api_bypassed"、"finished"）
+     * @param t     可选的异常对象；非 null 时会一并记录栈信息
+     */
     private static void writeBootstrapState(String event, Throwable t) {
         try {
             File file = new File(BOOTSTRAP_STATE_PATH);
