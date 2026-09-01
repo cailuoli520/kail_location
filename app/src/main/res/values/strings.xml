@@ -314,6 +314,9 @@
     <string name="setting_natural_jitter">自然 GPS 抖动</string>
     <string name="setting_natural_jitter_summary">在注入位置上叠加漂移，关闭后固定点和路线更稳定</string>
     <string name="setting_group_other">其他</string>
+    <string name="setting_xposed_module_group">Xposed 模块</string>
+    <string name="setting_xposed_module_hide">隐藏 Xposed 模块</string>
+    <string name="setting_xposed_module_summary">隐藏后桌面图标与 LSPosed 模块页的「打开」按钮都不会显示，恢复仅能通过本开关</string>
     <string name="setting_global_mode">全局模式 (system_server)</string>
     <string name="setting_global_mode_summary">开启则注入 system_server，对所有应用生效；关闭则仅注入下方指定应用</string>
     <string name="setting_target_packages">目标应用包名</string>

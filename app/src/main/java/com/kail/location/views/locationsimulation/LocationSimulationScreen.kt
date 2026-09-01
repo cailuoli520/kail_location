@@ -790,8 +790,8 @@ fun LocationSettingsDialog(
                     Slider(
                         value = stepCadenceSpm,
                         onValueChange = { onStepCadenceChange((it + 0.5f).toInt().toFloat()) },
-                        valueRange = 60f..180f,
-                        steps = 11,
+                        valueRange = 60f..240f,
+                        steps = 18,
                         colors = SliderDefaults.colors(
                             thumbColor = MaterialTheme.colorScheme.primary,
                             activeTrackColor = MaterialTheme.colorScheme.primary

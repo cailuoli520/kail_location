@@ -723,7 +723,7 @@ fun SettingsDialog(
                 Slider(
                     value = settings.speed,
                     onValueChange = { onSettingsChange(settings.copy(speed = (it * 10).toInt() / 10f)) },
-                    valueRange = 0f..120f,
+                    valueRange = 0f..200f,
                     colors = SliderDefaults.colors(
                         thumbColor = MaterialTheme.colorScheme.primary,
                         activeTrackColor = MaterialTheme.colorScheme.primary
@@ -818,7 +818,7 @@ fun SettingsDialog(
                     Slider(
                         value = settings.stepCadenceSpm,
                         onValueChange = { onSettingsChange(settings.copy(stepCadenceSpm = (it + 0.5f).toInt().toFloat())) },
-                        valueRange = 60f..180f,
+                        valueRange = 60f..240f,
                         colors = SliderDefaults.colors(
                             thumbColor = MaterialTheme.colorScheme.primary,
                             activeTrackColor = MaterialTheme.colorScheme.primary

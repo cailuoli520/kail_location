@@ -299,6 +299,9 @@
     <string name="setting_natural_jitter">Natural GPS Jitter</string>
     <string name="setting_natural_jitter_summary">Add drift to injected locations. Turn off for stable fixed points and routes.</string>
     <string name="setting_group_other">Other</string>
+    <string name="setting_xposed_module_group">Xposed Module</string>
+    <string name="setting_xposed_module_hide">Hide Xposed Module</string>
+    <string name="setting_xposed_module_summary">Hides the launcher icon and the LSPosed \"Open\" button. Turn this switch off to restore.</string>
     <string name="setting_global_mode">Global Mode (system_server)</string>
     <string name="setting_global_mode_summary">Inject system_server to affect all apps; disable to inject only target apps below</string>
     <string name="setting_target_packages">Target App Packages</string>

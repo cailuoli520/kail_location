@@ -272,6 +272,9 @@
     <string name="setting_natural_jitter">自然な GPS 揺らぎ</string>
     <string name="setting_natural_jitter_summary">注入位置に揺らぎを追加します。固定位置やルートを安定させる場合はオフにしてください。</string>
     <string name="setting_group_other">その他</string>
+    <string name="setting_xposed_module_group">Xposed モジュール</string>
+    <string name="setting_xposed_module_hide">Xposed モジュールを隠す</string>
+    <string name="setting_xposed_module_summary">隠すとデスクトップのアイコンと LSPosed の「開く」ボタンが消えます。復元はこのスイッチのみ。</string>
     <string name="setting_global_mode">グローバルモード (system_server)</string>
     <string name="setting_global_mode_summary">有効にすると system_server を注入し、すべてのアプリに適用されます。無効にすると以下の対象アプリのみ注入します</string>
     <string name="setting_target_packages">対象アプリのパッケージ名</string>

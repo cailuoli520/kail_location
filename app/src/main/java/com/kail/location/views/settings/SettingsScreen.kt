@@ -23,10 +23,14 @@ import androidx.compose.ui.unit.sp
 import com.kail.location.R
 import com.kail.location.utils.DataTransferManager
 import com.kail.location.utils.KailLog
+import com.kail.location.utils.ShellUtils
 import com.kail.location.viewmodels.SettingsViewModel
 import com.kail.location.views.common.BadgedControl
 import com.kail.location.views.common.HelpActionButton
 import com.kail.location.views.common.HelpOverlayScrim
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /**
  * 设置屏幕主界面
@@ -124,6 +128,23 @@ fun SettingsScreen(
     val simScheme by viewModel.simScheme.collectAsState()
     val opencellidApiKey by viewModel.opencellidApiKey.collectAsState()
     val selinuxPermissiveEnabled by viewModel.selinuxPermissiveEnabled.collectAsState()
+
+    // ===== Xposed 模块隐藏状态 =====
+    val xposedScope = rememberCoroutineScope()
+    var hasRoot by remember { mutableStateOf<Boolean?>(null) }
+    var xposedModuleState by remember { mutableStateOf("checking") } // checking | visible | hidden | absent
+
+    fun queryXposedModuleState(): String {
+        val visible = ShellUtils.executeCommand("pm list packages com.kail.locationxposed", 15_000L)
+        if (visible.contains("package:com.kail.locationxposed")) return "visible"
+        val all = ShellUtils.executeCommand("pm list packages -u com.kail.locationxposed", 15_000L)
+        return if (all.contains("package:com.kail.locationxposed")) "hidden" else "absent"
+    }
+
+    LaunchedEffect(Unit) {
+        hasRoot = withContext(Dispatchers.IO) { ShellUtils.hasRoot() }
+        xposedModuleState = withContext(Dispatchers.IO) { queryXposedModuleState() }
+    }
 
     Box {
         Scaffold(
@@ -384,6 +405,41 @@ fun SettingsScreen(
                     onValueChange = { viewModel.updateStringPreference(SettingsViewModel.KEY_HISTORY_EXPIRATION, it) }
                 )
             }
+
+            // ===== Group: Xposed 模块 =====
+            PreferenceCategory(title = stringResource(R.string.setting_xposed_module_group))
+
+            val moduleSummary = when {
+                xposedModuleState == "checking" -> "检测中…"
+                xposedModuleState == "absent" -> context.getString(R.string.setting_xposed_module_summary)
+                hasRoot != true -> context.getString(R.string.setting_xposed_module_summary)
+                xposedModuleState == "hidden" -> "已隐藏：桌面图标与 LSPosed 模块页的「打开」按钮不可见，可随时恢复"
+                else -> "显示中：桌面图标可见，LSPosed 模块页可一键打开"
+            }
+            SwitchPreference(
+                title = stringResource(R.string.setting_xposed_module_hide),
+                checked = xposedModuleState == "hidden",
+                enabled = hasRoot == true && xposedModuleState != "checking" && xposedModuleState != "absent",
+                summary = moduleSummary,
+                onCheckedChange = { hide ->
+                    xposedScope.launch(Dispatchers.IO) {
+                        val cmd = if (hide) "pm hide com.kail.locationxposed" else "pm unhide com.kail.locationxposed"
+                        val out = ShellUtils.executeCommand(cmd, 30_000L)
+                        xposedModuleState = queryXposedModuleState()
+                        val ok = if (hide) xposedModuleState == "hidden" else xposedModuleState == "visible"
+                        withContext(Dispatchers.Main) {
+                            android.widget.Toast.makeText(
+                                context,
+                                if (ok) {
+                                    if (hide) "Xposed 模块已隐藏（桌面图标与 LSPosed 按钮已消失）"
+                                    else "Xposed 模块已恢复显示"
+                                } else "操作失败：$out",
+                                android.widget.Toast.LENGTH_LONG
+                            ).show()
+                        }
+                    }
+                }
+            )
 
             // ===== Group: 数据备份 =====
             PreferenceCategory(title = stringResource(R.string.setting_group_data_transfer))
@@ -682,7 +738,8 @@ fun SwitchPreference(
     title: String,
     checked: Boolean,
     onCheckedChange: (Boolean) -> Unit,
-    summary: String? = null
+    summary: String? = null,
+    enabled: Boolean = true
 ) {
     ListItem(
         headlineContent = { Text(title) },
@@ -690,10 +747,11 @@ fun SwitchPreference(
         trailingContent = {
             Switch(
                 checked = checked,
-                onCheckedChange = onCheckedChange
+                onCheckedChange = onCheckedChange,
+                enabled = enabled
             )
         },
-        modifier = Modifier.clickable { onCheckedChange(!checked) }
+        modifier = Modifier.clickable(enabled = enabled) { onCheckedChange(!checked) }
     )
 }
 

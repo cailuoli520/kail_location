@@ -63,18 +63,45 @@ fun AppDrawer(
     }
 
     fun getXposedModuleVersionCode(): Int? {
-        return try {
-            val pm = context.packageManager
-            val pkgInfo = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
-                pm.getPackageInfo("com.kail.locationxposed", android.content.pm.PackageManager.PackageInfoFlags.of(0))
-            } else {
-                @Suppress("DEPRECATION")
-                pm.getPackageInfo("com.kail.locationxposed", 0)
+        val pm = context.packageManager
+        val pkgName = "com.kail.locationxposed"
+        // 1) Query with flags that keep hidden/disabled packages visible
+        //    (a pm hidden module is invisible to a plain getPackageInfo(..., 0)).
+        val flagCandidates = listOf(
+            android.content.pm.PackageManager.MATCH_UNINSTALLED_PACKAGES,
+            android.content.pm.PackageManager.MATCH_DISABLED_COMPONENTS,
+            android.content.pm.PackageManager.MATCH_ALL
+        )
+        for (flag in flagCandidates) {
+            try {
+                val pkgInfo = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+                    pm.getPackageInfo(
+                        pkgName,
+                        android.content.pm.PackageManager.PackageInfoFlags.of(flag.toLong())
+                    )
+                } else {
+                    @Suppress("DEPRECATION")
+                    pm.getPackageInfo(pkgName, flag)
+                }
+                return pkgInfo.longVersionCode.toInt()
+            } catch (_: Exception) {
             }
-            pkgInfo.longVersionCode.toInt()
-        } catch (e: Exception) {
-            null
         }
+        // 2) Fallback: the module may be pm-hidden (root hide). It is still
+        //    fully functional for LSPosed, but invisible to package queries,
+        //    so ask root shell for its presence + versionCode.
+        if (com.kail.location.utils.ShellUtils.hasRoot()) {
+            val listOut = com.kail.location.utils.ShellUtils.executeCommand("pm list packages -u $pkgName", 15_000L)
+            if (listOut.contains("package:$pkgName")) {
+                val dump = com.kail.location.utils.ShellUtils.executeCommand(
+                    "dumpsys package $pkgName",
+                    15_000L
+                )
+                val m = Regex("versionCode=(\\d+)").find(dump)
+                return m?.groupValues?.get(1)?.toIntOrNull()
+            }
+        }
+        return null
     }
 
     var xposedDownloadProgress by remember { mutableStateOf(-1) }
