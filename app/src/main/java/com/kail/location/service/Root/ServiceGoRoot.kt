@@ -331,6 +331,18 @@ class ServiceGoRoot : Service() {
         mNotificationHelper.startForegroundIfReady()
 
         if (intent != null) {
+            // "临时宽容模式"开关：开启后从本模拟会话开始到 onDestroy 停止期间，
+            // 保持 SELinux=Permissive。注入窗口（ensureBaseline/kail_inject）内的
+            // addService、以及会话期间 App 侧每 250ms 的 find/binder IPC 全部放行，
+            // 无需依赖文件通道；停止模拟时由 onDestroy 统一 setenforce 1 恢复强制。
+            val permissiveDuringMock = PreferenceManager.getDefaultSharedPreferences(this)
+                .getBoolean(SettingsViewModel.KEY_SELINUX_PERMISSIVE, false)
+            if (permissiveDuringMock) {
+                runCatching { ShellUtils.executeCommand("setenforce 0") }
+                    .onFailure { KailLog.e(this, TAG, "mock session setenforce 0: ${it.message}") }
+                KailLog.i(this, TAG, "mock session: SELinux permissive ON (setting_selinux_permissive)")
+            }
+
             modeWifiOnly = intent.getBooleanExtra(EXTRA_WIFI_ONLY, false)
             modeCellOnly = intent.getBooleanExtra(EXTRA_CELL_ONLY, false)
             modeHideOnly = intent.getBooleanExtra(EXTRA_HIDE_ONLY, false)
@@ -569,6 +581,8 @@ class ServiceGoRoot : Service() {
                 }
                 modeCellOnly = false
                 pendingCellList = emptyList()
+                // 文件通道兜底：Binder 失败时也要清空注入层的模拟小区。
+                writeCellMockFile(emptyList())
                 KailLog.i(this, TAG, "Cell mock stopped via control")
                 if (!isAnyMockActive()) stopSelf()
             }.onFailure { KailLog.e(this, TAG, "stop_cell: ${it.message}") }
@@ -815,6 +829,11 @@ class ServiceGoRoot : Service() {
      */
     private fun applyAllowPackages(pkgs: List<String>) {
         val list = ArrayList(pkgs)
+        // 文件通道先行：SELinux Enforcing 下 oem_location/oem_wifi binder 注册与
+        // find 均被拦截，setAllowMockPackages 只能通过 /data/kail-loc/
+        // allow_mock_packages.txt 被 system_server 内的 RootLocationControl 轮询
+        // 生效。文件通道始终写（binder 可用时值一致，无副作用），是主通道。
+        writeAllowMockPackagesFile(list)
         // oem_location (covers location, GNSS, cells — all gated by
         // MockLocationHookManager.isAllowMockPackage).
         runCatching {
@@ -850,6 +869,25 @@ class ServiceGoRoot : Service() {
                 }
             }, "ServiceGoRootTargetInject").start()
         }
+    }
+
+    /**
+     * 把独立模拟白名单写进文件通道 /data/kail-loc/allow_mock_packages.txt。
+     * system_server 内的 RootLocationControl 每 250ms 轮询该文件并直接
+     * setAllowMockPackages，绕过 SELinux 对 oem_location/oem_wifi binder 的拦截。
+     * 空列表写 enabled=0（= 对所有应用生效）；与 hide_config 写入方式完全一致。
+     */
+    private fun writeAllowMockPackagesFile(pkgs: List<String>) {
+        val content = if (pkgs.isEmpty()) {
+            "enabled=0\n"
+        } else {
+            "enabled=1\npackages=${pkgs.joinToString(",")}\n"
+        }
+        val cmd = "mkdir -p /data/kail-loc && chmod 777 /data/kail-loc && " +
+            "printf '%s' ${shellSingleQuote(content)} > /data/kail-loc/allow_mock_packages.txt && chmod 644 /data/kail-loc/allow_mock_packages.txt"
+        runCatching { ShellUtils.executeCommand(cmd) }
+            .onFailure { KailLog.e(this, TAG, "writeAllowMockPackagesFile: ${it.message}") }
+        KailLog.i(this, TAG, "allow mock packages file written: enabled=${if (pkgs.isEmpty()) 0 else 1} pkgs=${if (pkgs.isEmpty()) "-" else pkgs.joinToString()}")
     }
 
     // ------------------------------------------------------------------
@@ -1222,7 +1260,10 @@ class ServiceGoRoot : Service() {
                 else -> "FakeLocation 控制文件路径模拟生效"
             })
         diag.finish()
+        // 每次位置模拟启动都重推独立模拟白名单（文件通道 + binder），保证 prefs
+        // 中的最新选择生效，也不依赖上次会话的遗留文件状态。
         if (controlOk && isCurrentGeneration(generation) && !modeWifiOnly && !modeCellOnly) {
+            applyAllowPackages(independentAllowPackages)
             startLocationLoop()
         }
 
@@ -1364,6 +1405,8 @@ class ServiceGoRoot : Service() {
         // session isn't accidentally restricted to stale target packages.
         runCatching { mockLocService?.setAllowMockPackages(null) }
         runCatching { stopWifiMockOnInjection(retry) }
+        // 文件通道兜底：清空 WiFi 模拟与基站模拟文件（enabled=0），供下次会话干净起步。
+        runCatching { writeCellMockFile(emptyList()) }
         fakelocStartCalled = false
         runCatching { mMockLocationProvider.cleanup() }
             .onFailure { KailLog.e(this, TAG, "cleanup providers: ${it.message}") }
@@ -1423,11 +1466,74 @@ class ServiceGoRoot : Service() {
         dest.writeString(wifi.capabilities)
     }
 
+    /**
+     * 把 WiFi 模拟列表写进文件通道 /data/kail-loc/mock_wifi.txt。
+     * system_server 内的 RootLocationControl 轮询该文件并直接刷入
+     * MockWifiConfigManager，绕过 SELinux 对 oem_wifi binder 的拦截。
+     * 空列表写 enabled=0（= 停止 WiFi 模拟）。
+     */
+    private fun writeWifiMockFile(list: List<com.kail.location.models.WifiInfo>) {
+        val sb = StringBuilder()
+        if (list.isEmpty()) {
+            sb.append("enabled=0\n")
+        } else {
+            sb.append("enabled=1\n")
+            list.forEachIndexed { index, wifi ->
+                if (index > 0) sb.append("\n")
+                sb.append("ssid=${wifi.ssid}\n")
+                sb.append("bssid=${wifi.bssid}\n")
+                sb.append("rssi=${wifi.rssi}\n")
+                sb.append("link_speed=${wifi.linkSpeed}\n")
+                sb.append("frequency=${wifi.frequency}\n")
+                sb.append("capabilities=${wifi.capabilities}\n")
+            }
+        }
+        writeMockConfigFile("/data/kail-loc/mock_wifi.txt", sb.toString(), "wifi")
+    }
+
+    /**
+     * 把基站模拟列表写进文件通道 /data/kail-loc/mock_cell.txt。
+     * system_server 内的 RootLocationControl 轮询该文件并直接刷入
+     * MockLocationHookManager.setMockCells，绕过 SELinux 对 oem_location binder 的拦截。
+     * 空列表写 enabled=0（= 停止基站模拟）。
+     */
+    private fun writeCellMockFile(list: List<com.kail.location.models.CellInfo>) {
+        val sb = StringBuilder()
+        if (list.isEmpty()) {
+            sb.append("enabled=0\n")
+        } else {
+            sb.append("enabled=1\n")
+            list.forEachIndexed { index, cell ->
+                if (index > 0) sb.append("\n")
+                sb.append("radio_type=${cell.networkType}\n")
+                sb.append("mcc=${cell.mcc}\n")
+                sb.append("mnc=${cell.mnc}\n")
+                sb.append("lac=${cell.lac}\n")
+                sb.append("psc=${cell.psc}\n")
+                sb.append("cell_id=${cell.cid}\n")
+                sb.append("lat=${cell.latitude}\n")
+                sb.append("lng=${cell.longitude}\n")
+                sb.append("accuracy=${cell.radius}\n")
+            }
+        }
+        writeMockConfigFile("/data/kail-loc/mock_cell.txt", sb.toString(), "cell")
+    }
+
+    private fun writeMockConfigFile(path: String, content: String, what: String) {
+        val cmd = "mkdir -p /data/kail-loc && chmod 777 /data/kail-loc && " +
+            "printf '%s' ${shellSingleQuote(content)} > $path && chmod 644 $path"
+        runCatching { ShellUtils.executeCommand(cmd) }
+            .onFailure { KailLog.e(this, TAG, "write${what}MockFile: ${it.message}") }
+        KailLog.i(this, TAG, "$what mock file written: ${content.lineSequence().firstOrNull() ?: ""} (${content.length}b)")
+    }
+
     private fun applyWifiMockOnInjection() {
         if (pendingWifiList.isEmpty()) {
             KailLog.w(this, TAG, "applyWifiMockOnInjection: no WiFi networks selected")
             return
         }
+        // 文件通道先行（主通道），binder 仅作兼容路径。
+        writeWifiMockFile(pendingWifiList)
         val binder = resolveMockWifiBinder()
         if (binder == null) {
             KailLog.w(this, TAG, "oem_wifi binder not online yet")
@@ -1471,6 +1577,8 @@ class ServiceGoRoot : Service() {
     }
 
     private fun stopWifiMockOnInjection(retry: Boolean = true) {
+        // 文件通道先行：清空 /data/kail-loc/mock_wifi.txt（enabled=0）。
+        writeWifiMockFile(emptyList())
         val binder = resolveMockWifiBinder(retry) ?: return
         runCatching {
             val data = Parcel.obtain()
@@ -1523,6 +1631,8 @@ class ServiceGoRoot : Service() {
             KailLog.w(this, TAG, "applyCellMockOnInjection: no cells selected")
             return
         }
+        // 文件通道先行（主通道），binder 仅作兼容路径。
+        writeCellMockFile(pendingCellList)
         val svc = resolveMockLocServiceWithRetry()
         if (svc == null) {
             KailLog.w(this, TAG, "oem_location binder not online yet (cell)")

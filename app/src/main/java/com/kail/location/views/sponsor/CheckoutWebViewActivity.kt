@@ -161,6 +161,7 @@ class CheckoutWebViewActivity : BaseActivity() {
                             Log.d(TAG, "支付弹窗被关闭（onDismissRequest），后续不再自动弹出")
                             qrDismissed = true
                             qrCodeImage = null
+                            paymentMethod = null
                         },
                         title = {
                             Row(
@@ -172,6 +173,7 @@ class CheckoutWebViewActivity : BaseActivity() {
                                     Log.d(TAG, "支付弹窗被关闭（X 按钮），后续不再自动弹出")
                                     qrDismissed = true
                                     qrCodeImage = null
+                                    paymentMethod = null
                                 }) {
                                     Icon(Icons.Default.Close, contentDescription = "关闭")
                                 }

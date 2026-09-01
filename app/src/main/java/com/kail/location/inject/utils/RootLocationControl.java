@@ -13,6 +13,8 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.FileReader;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.List;
 
 public final class RootLocationControl {
     private static final String TAG = "RootLocationControl";
@@ -30,6 +32,12 @@ public final class RootLocationControl {
     private static long lastModified;
     private static long lastLength;
     private static long applyCount;
+    private static long lastAllowModified;
+    private static long lastAllowLength;
+    private static long lastWifiModified;
+    private static long lastWifiLength;
+    private static long lastCellModified;
+    private static long lastCellLength;
     private static volatile boolean lastStepEnabled;
     private static volatile float lastStepSpm = -1.0f;
     private static volatile int lastStepMode = -1;
@@ -70,6 +78,8 @@ public final class RootLocationControl {
         thread.start();
         writeAck("started", null, null);
         InjectLog.persist(TAG, "started context=", context, " control=", controlPath);
+        // 文件通道白名单：启动时立即应用一次，随后由 loop() 按文件变化持续刷新。
+        applyAllowPackagesFromFile();
     }
 
     private static void loop() {
@@ -84,6 +94,9 @@ public final class RootLocationControl {
                     lastLength = length;
                     scheduleApply(file);
                 }
+                refreshAllowMockPackagesIfNeeded();
+                refreshWifiMockIfNeeded();
+                refreshCellMockIfNeeded();
                 refreshStepAckIfNeeded();
                 Thread.sleep(250L);
             } catch (Throwable t) {
@@ -94,6 +107,167 @@ public final class RootLocationControl {
                 } catch (InterruptedException ignored) {
                 }
             }
+        }
+    }
+
+    /**
+     * 文件通道白名单轮询：<i>独立模拟</i>的目标应用白名单由 Kail 应用经 root 写入
+     * {@link AllowMockPackagesConfigFile#PATH}，SELinux Enforcing 下 oem_location /
+     * oem_wifi binder 不可用（addService 被拒、find 被拦），因此这里在 system_server
+     * 内直接读文件并刷入 {@link MockLocationHookManager#setAllowMockPackages} /
+     * {@link MockWifiConfigManager#setAllowMockPackages}，使白名单对位置 / GNSS /
+     * 基站（经由 isAllowMockPackage 分发）与 WiFi 列表同时生效。
+     */
+    private static void refreshAllowMockPackagesIfNeeded() {
+        try {
+            File file = new File(AllowMockPackagesConfigFile.PATH);
+            long modified = file.exists() ? file.lastModified() : 0L;
+            long length = file.exists() ? file.length() : 0L;
+            if (modified == lastAllowModified && length == lastAllowLength) {
+                return;
+            }
+            lastAllowModified = modified;
+            lastAllowLength = length;
+            applyAllowPackagesFromFile();
+        } catch (Throwable t) {
+            InjectLog.e(TAG, "allow mock packages refresh error", t);
+        }
+    }
+
+    /**
+     * 读取白名单文件并刷新到 MockLocationHookManager / MockWifiConfigManager。
+     * enabled=0 或 packages 为空时传 null（= 对所有应用生效，恢复默认行为）。
+     */
+    private static void applyAllowPackagesFromFile() {
+        try {
+            AllowMockPackagesConfigFile.Config cfg = AllowMockPackagesConfigFile.read();
+            List<String> pkgs = cfg.enabled && !cfg.packages.isEmpty() ? cfg.packages : null;
+            MockLocationHookManager.setAllowMockPackages(pkgs == null ? null : new ArrayList<String>(pkgs));
+            MockWifiConfigManager.setAllowMockPackages(pkgs == null ? null : new ArrayList<String>(pkgs));
+            InjectLog.persist(TAG, "allow mock packages applied: enabled=", cfg.enabled,
+                    " pkgs=", pkgs == null ? "<all apps>" : pkgs.toString());
+        } catch (Throwable t) {
+            InjectLog.e(TAG, "allow mock packages apply error", t);
+        }
+    }
+
+    /**
+     * WiFi 模拟文件通道轮询：Kail 应用经 root 写 mock_wifi.txt，这里检测文件
+     * 变化后刷入 MockWifiConfigManager。enabled=0 时只关闭模拟开关，不清网络
+     * 列表（binder stopMockWifi 同语义）。
+     */
+    private static void refreshWifiMockIfNeeded() {
+        try {
+            File file = new File(WifiMockConfigFile.PATH);
+            long modified = file.exists() ? file.lastModified() : 0L;
+            long length = file.exists() ? file.length() : 0L;
+            if (modified == lastWifiModified && length == lastWifiLength) {
+                return;
+            }
+            lastWifiModified = modified;
+            lastWifiLength = length;
+            applyWifiMockFromFile();
+        } catch (Throwable t) {
+            InjectLog.e(TAG, "wifi mock refresh error", t);
+        }
+    }
+
+    /**
+     * 读取 WiFi 模拟文件并刷新到 MockWifiConfigManager。序列与
+     * MockWifiManagerService.startMockWifi 等价：
+     * 设置网络列表/主网络，License 可用时挂 WifiServiceHook 并置开关。
+     */
+    private static void applyWifiMockFromFile() {
+        try {
+            WifiMockConfigFile.Config cfg = WifiMockConfigFile.read();
+            if (!cfg.enabled || cfg.networks.isEmpty()) {
+                MockWifiConfigManager.setMockWifiEnabled(false);
+                InjectLog.persist(TAG, "wifi mock disabled by file");
+                return;
+            }
+            MockWifiConfigManager.setMockWifiNetworks(cfg.networks);
+            MockWifiConfigManager.setPrimaryMockWifiNetwork(cfg.networks.get(0));
+            if (LicenseStateManager.isLicenseUsable()
+                    && com.kail.location.inject.fakelocation.InjectDex.getApplicationContext() != null) {
+                if (!com.kail.location.inject.fakelocation.hook.system.WifiServiceHook.scanResultsHooked) {
+                    com.kail.location.inject.fakelocation.hook.system.WifiServiceHook.hook(
+                            com.kail.location.inject.fakelocation.InjectDex.getApplicationContext().getClassLoader());
+                }
+                if (!com.kail.location.inject.fakelocation.hook.system.WifiServiceHook.connectionInfoHooked) {
+                    com.kail.location.inject.fakelocation.hook.system.WifiServiceHook.hookGetConnectionInfo(
+                            com.kail.location.inject.fakelocation.InjectDex.getApplicationContext().getClassLoader());
+                }
+                MockWifiConfigManager.setMockWifiEnabled(true);
+            }
+            InjectLog.persist(TAG, "wifi mock applied: enabled=1 networks=", cfg.networks.size());
+        } catch (Throwable t) {
+            InjectLog.e(TAG, "wifi mock apply error", t);
+        }
+    }
+
+    /**
+     * 基站模拟文件通道轮询：Kail 应用经 root 写 mock_cell.txt，这里检测文件
+     * 变化后刷入 MockLocationHookManager。enabled=0 时清空模拟小区
+     * （binder setMockCells(null) 同语义）。
+     */
+    private static void refreshCellMockIfNeeded() {
+        try {
+            File file = new File(CellMockConfigFile.PATH);
+            long modified = file.exists() ? file.lastModified() : 0L;
+            long length = file.exists() ? file.length() : 0L;
+            if (modified == lastCellModified && length == lastCellLength) {
+                return;
+            }
+            lastCellModified = modified;
+            lastCellLength = length;
+            applyCellMockFromFile();
+        } catch (Throwable t) {
+            InjectLog.e(TAG, "cell mock refresh error", t);
+        }
+    }
+
+    /**
+     * 读取基站模拟文件并刷新到 MockLocationHookManager。序列与 App 侧
+     * applyCellMockOnInjection（binder 路径）等价：
+     * 置小区列表 + scoped 块列表（只放行基站 "e" 作用域）+ 打开 master mock +
+     * seed 一个基准位置（供 CellInfoFactory/onCellLocationChanged 取坐标）。
+     */
+    private static void applyCellMockFromFile() {
+        try {
+            CellMockConfigFile.Config cfg = CellMockConfigFile.read();
+            if (!cfg.enabled || cfg.towers.isEmpty()) {
+                MockLocationHookManager.setMockCells(null);
+                InjectLog.persist(TAG, "cell mock disabled by file");
+                return;
+            }
+            MockLocationHookManager.setMockCells(cfg.towers);
+            MockLocationHookManager.setSafeApps(new ArrayList<String>(java.util.Collections.singletonList("abhf|*")));
+            MockLocationHookManager.setMockGpsStatus(false);
+            MockLocationHookManager.startMockLocation();
+            com.kail.location.inject.fakelocation.model.CellTowerInfo anchor = null;
+            for (com.kail.location.inject.fakelocation.model.CellTowerInfo t : cfg.towers) {
+                if (t.getLatitude() != 0.0 || t.getLongitude() != 0.0) {
+                    anchor = t;
+                    break;
+                }
+            }
+            double baseLat = anchor != null ? anchor.getLatitude() : cfg.towers.get(0).getLatitude();
+            double baseLng = anchor != null ? anchor.getLongitude() : cfg.towers.get(0).getLongitude();
+            android.location.Location loc = new android.location.Location(android.location.LocationManager.GPS_PROVIDER);
+            loc.setLatitude(baseLat);
+            loc.setLongitude(baseLng);
+            loc.setAltitude(0.0);
+            loc.setAccuracy(25.0f);
+            loc.setTime(System.currentTimeMillis());
+            loc.setElapsedRealtimeNanos(android.os.SystemClock.elapsedRealtimeNanos());
+            android.os.Bundle extras = new android.os.Bundle();
+            extras.putString("from", "loc");
+            loc.setExtras(extras);
+            MockLocationHookManager.setMockLocation(loc);
+            InjectLog.persist(TAG, "cell mock applied: towers=", cfg.towers.size(),
+                    " anchor=", baseLat, ",", baseLng);
+        } catch (Throwable t) {
+            InjectLog.e(TAG, "cell mock apply error", t);
         }
     }
 
@@ -144,6 +318,8 @@ public final class RootLocationControl {
         if (!control.enabled) {
             MockLocationHookManager.stopMockLocation();
             MockLocationHookManager.setMockGpsStatus(false);
+            MockLocationHookManager.setMockCells(null);
+            MockLocationHookManager.setSafeApps(null);
             applyStepControl(control);
             lastControl = control;
             writeAck("disabled", control, null);

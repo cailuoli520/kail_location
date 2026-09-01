@@ -6,6 +6,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import com.baidu.mapapi.map.MapStatusUpdateFactory
 import com.baidu.mapapi.map.MapView
 import com.baidu.mapapi.model.LatLng
@@ -26,6 +29,14 @@ fun JoystickRoot(
     onFocusModeChanged: (Boolean) -> Unit = {}
 ) {
     val windowType by viewModel.windowType.collectAsState()
+    var minimized by remember { mutableStateOf(false) }
+
+    // Reset minimized state whenever we leave/enter the main joystick window.
+    LaunchedEffect(windowType) {
+        if (windowType != JoystickViewModel.WindowType.JOYSTICK) {
+            minimized = false
+        }
+    }
 
     LaunchedEffect(windowType) {
         val needsFocus = windowType == JoystickViewModel.WindowType.HISTORY || windowType == JoystickViewModel.WindowType.MAP
@@ -50,11 +61,19 @@ fun JoystickRoot(
 
     when (windowType) {
         JoystickViewModel.WindowType.JOYSTICK -> {
-            JoyStickOverlay(
-                viewModel = viewModel,
-                onMoveInfo = onMoveInfo,
-                onWindowDrag = onWindowDrag
-            )
+            if (minimized) {
+                MinimizedJoystickBall(
+                    onOpen = { minimized = false },
+                    onWindowDrag = onWindowDrag
+                )
+            } else {
+                JoyStickOverlay(
+                    viewModel = viewModel,
+                    onMoveInfo = onMoveInfo,
+                    onWindowDrag = onWindowDrag,
+                    onMinimize = { minimized = true }
+                )
+            }
         }
         JoystickViewModel.WindowType.MAP -> {
             if (mapView != null) {

@@ -49,7 +49,7 @@ fun XposedSettingsScreen(
     var downgradeCdma by remember { mutableStateOf(prefs.getBoolean("setting_downgrade_cdma", false)) }
     var antiPullback by remember { mutableStateOf(prefs.getBoolean("setting_anti_pullback", false)) }
     var minSatellites by remember { mutableStateOf(prefs.getString("setting_min_satellites", "12") ?: "12") }
-    var reportInterval by remember { mutableStateOf(prefs.getString("setting_report_interval", "100") ?: "100") }
+    var reportInterval by remember { mutableStateOf(prefs.getString("setting_report_interval", "200") ?: "200") }
 
     ModalNavigationDrawer(
         drawerState = drawerState,

@@ -261,6 +261,11 @@ object RootDeployer {
                     .getBoolean(SettingsViewModel.KEY_SELINUX_PERMISSIVE, false)
             }.getOrDefault(false)
         } ?: false
+        // 会话宽容（模拟开始→停止）：ServiceGoRoot.onStartCommand 已把系统切成
+        // Permissive，且由 onDestroy 负责恢复 Enforcing。此时注入窗口结束后
+        // 绝不能 setenforce 1 把会话宽容打断（否则后续 App 侧 find/binder 又
+        // 被 SELinux 拦截），因此 finally 只恢复非会话宽容的"注入窗口"模式。
+        val sessionPermissive = selinuxPermissiveDuringInject
         var prevEnforce: String? = null
         return try {
             if (!ShellUtils.hasRoot()) return false to "su 不可用（未授权 ROOT）"
@@ -338,10 +343,14 @@ object RootDeployer {
             KailLog.w(null, TAG, "bootstrapInjection: Xposed 桥接也不可用")
             false to "ptrace 注入失败（$ptraceDetail），Xposed 桥接也不可用"
         } finally {
-            if (selinuxPermissiveDuringInject) {
+            // 会话宽容模式：注入窗口结束时不恢复 Enforcing（由 ServiceGoRoot 的
+            // onDestroy 统一恢复），否则后续模拟调用又会被 SELinux 拦截。
+            if (selinuxPermissiveDuringInject && !sessionPermissive) {
                 rootCmd("setenforce 1")
                 val nowEnforce = rootCmd("getenforce").trim()
                 KailLog.i(null, TAG, "bootstrapInjection: SELinux restored -> $nowEnforce (was $prevEnforce before inject)")
+            } else if (selinuxPermissiveDuringInject) {
+                KailLog.i(null, TAG, "bootstrapInjection: SELinux stays permissive for the mock session (restored at service stop)")
             }
         }
     }

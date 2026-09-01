@@ -65,7 +65,8 @@ import kotlin.math.sqrt
 fun JoyStickOverlay(
     viewModel: JoystickViewModel,
     onMoveInfo: (Boolean, Double, Double) -> Unit, // auto, angle, r
-    onWindowDrag: (Float, Float) -> Unit
+    onWindowDrag: (Float, Float) -> Unit,
+    onMinimize: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val prefs = remember { PreferenceManager.getDefaultSharedPreferences(context) }
@@ -79,56 +80,71 @@ fun JoyStickOverlay(
         modifier = Modifier.wrapContentSize(),
         horizontalAlignment = Alignment.Start
     ) {
-        Row(
-            modifier = Modifier
-                .wrapContentSize()
-                .background(Color(0xCC000000), RoundedCornerShape(16.dp))
-                .padding(8.dp)
-                .pointerInput(Unit) {
-                    detectDragGestures { change, dragAmount ->
-                        change.consume()
-                        onWindowDrag(dragAmount.x, dragAmount.y)
-                    }
-                },
-            verticalAlignment = Alignment.CenterVertically
+        Box(
+            modifier = Modifier.wrapContentSize(),
+            contentAlignment = Alignment.TopEnd
         ) {
-            // Left Column: Speed Settings, History, Map
-            Column(
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-                modifier = Modifier.padding(end = 8.dp)
+            Row(
+                modifier = Modifier
+                    .wrapContentSize()
+                    .background(Color(0xCC000000), RoundedCornerShape(16.dp))
+                    .padding(8.dp)
+                    .pointerInput(Unit) {
+                        detectDragGestures { change, dragAmount ->
+                            change.consume()
+                            onWindowDrag(dragAmount.x, dragAmount.y)
+                        }
+                    },
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                CircleIconButton(
-                    iconRes = R.drawable.ic_menu_settings,
-                    contentDescription = "Speed Settings",
-                    onClick = { showSpeedSettings = !showSpeedSettings }
-                )
-                CircleIconButton(
-                    iconRes = R.drawable.ic_history,
-                    contentDescription = "History",
-                    onClick = { viewModel.setWindowType(JoystickViewModel.WindowType.HISTORY) }
-                )
-                CircleIconButton(
-                    iconRes = R.drawable.ic_map,
-                    contentDescription = "Map",
-                    onClick = { viewModel.setWindowType(JoystickViewModel.WindowType.MAP) }
-                )
-            }
-
-            // Right Side: Rocker or Buttons
-            Box(
-                contentAlignment = Alignment.Center
-            ) {
-                if (joystickType == "0") {
-                    Rocker(
-                        modifier = Modifier.size(100.dp),
-                        onUpdate = onMoveInfo
+                // Left Column: Speed Settings, History, Map
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.padding(end = 8.dp)
+                ) {
+                    CircleIconButton(
+                        iconRes = R.drawable.ic_menu_settings,
+                        contentDescription = "Speed Settings",
+                        onClick = { showSpeedSettings = !showSpeedSettings }
                     )
-                } else {
-                    DirectionalButtons(
-                        onUpdate = onMoveInfo
+                    CircleIconButton(
+                        iconRes = R.drawable.ic_history,
+                        contentDescription = "History",
+                        onClick = { viewModel.setWindowType(JoystickViewModel.WindowType.HISTORY) }
+                    )
+                    CircleIconButton(
+                        iconRes = R.drawable.ic_map,
+                        contentDescription = "Map",
+                        onClick = { viewModel.setWindowType(JoystickViewModel.WindowType.MAP) }
                     )
                 }
+
+                // Right Side: Rocker or Buttons
+                Box(
+                    contentAlignment = Alignment.Center
+                ) {
+                    if (joystickType == "0") {
+                        Rocker(
+                            modifier = Modifier.size(100.dp),
+                            onUpdate = onMoveInfo
+                        )
+                    } else {
+                        DirectionalButtons(
+                            onUpdate = onMoveInfo
+                        )
+                    }
+                }
             }
+
+            // Minimize button (top-right corner of the overlay)
+            CircleIconButton(
+                iconRes = R.drawable.ic_minimize,
+                contentDescription = "Minimize",
+                onClick = onMinimize,
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .offset(x = (-1).dp, y = (-9).dp)
+            )
         }
 
         if (showSpeedSettings) {
@@ -143,6 +159,41 @@ fun JoyStickOverlay(
                 onClose = { showSpeedSettings = false }
             )
         }
+    }
+}
+
+/**
+ * Minimized joystick ball shown after tapping the minimize button.
+ * Draggable; tap to restore the full joystick overlay.
+ *
+ * @param onOpen Callback to restore the full overlay.
+ * @param onWindowDrag Callback when the ball is dragged.
+ */
+@Composable
+fun MinimizedJoystickBall(
+    onOpen: () -> Unit,
+    onWindowDrag: (Float, Float) -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .size(52.dp)
+            .background(Color(0xCC000000), CircleShape)
+            .pointerInput(Unit) {
+                detectDragGestures { change, dragAmount ->
+                    change.consume()
+                    onWindowDrag(dragAmount.x, dragAmount.y)
+                }
+            }
+            .clickable(onClick = onOpen),
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(
+            painter = painterResource(R.drawable.ic_move),
+            contentDescription = "Open Joystick",
+            tint = Color.White,
+            modifier = Modifier.size(26.dp)
+        )
     }
 }
 
