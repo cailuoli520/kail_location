@@ -11,6 +11,7 @@ pluginManagement {
                 includeGroupByRegex("com\\.android.*")
                 includeGroupByRegex("com\\.google.*")
                 includeGroupByRegex("androidx.*")
+                excludeGroupByRegex("com\\.google\\.devtools\\.ksp.*")  // KSP is on mavenCentral/gradlePluginPortal, not Google
             }
         }
         mavenCentral()

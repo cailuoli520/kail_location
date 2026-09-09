@@ -81,7 +81,7 @@ static const char *kPayloadMd5  = "";
 //   keytool -exportcert -alias <alias> -keystore <keystore> | xxd -p | tr -d '\n'
 //
 // An empty string disables the signature comparison.
-static const char *kReleaseSign =
+static const char *kReleaseSign_Upstream =
     "3082034e30820236020101300d06092a864886f70d01010b0500306c3115301306035504030c0c4b61696c4c6f"
     "636174696f6e3111300f060355040b0c08506572736f6e616c3111300f060355040a0c08506572736f6e616c31"
     "0f300d06035504070c066265696a696e310f300d06035504080c066265696a696e310b30090603550406130243"
@@ -103,8 +103,7 @@ static const char *kReleaseSign =
     "7dc77b9fc04a222bfe80e4a1d913d993724801c6dfbb58be6ed61f6544a8bb10d4ceab13cc99942f";
 
 // Stash the debug keystore cert hex here for easy re-enabling later:
-static const char *kReleaseSign_DebugKeystore =
-    "308202e4308201cc020101300d06092a864886f70d01010b050030373116301406035504030c0d416e64726f"
+static const char *kReleaseSign_DebugKeystore =    "308202e4308201cc020101300d06092a864886f70d01010b050030373116301406035504030c0d416e64726f"
     "69642044656275673110300e060355040a0c07416e64726f6964310b30090603550406130255533020170d32"
     "36303431323039353132355a180f32303536303430343039353132355a30373116301406035504030c0d416e"
     "64726f69642044656275673110300e060355040a0c07416e64726f6964310b3009060355040613025553308201"
@@ -121,6 +120,11 @@ static const char *kReleaseSign_DebugKeystore =
     "dfc3ba979e236a6128eef87ebebdbb34cb2f7aa4c0a903a092b102616461bffa01b0c0545842f14153e263ec"
     "6e3be3df858bc090048637c9b2128cb42c64f417b80dc219e073a72699b677db563ba69ddab6689b7974626d"
     "d058a65e780221b0e2e6a0b6ee4a097f487c7c8be762a11c711505c492a6131ab7df78639eaf";
+
+// [LOCAL-UNLOCK] active key: empty = skip the release-signature comparison
+// (upstream comment: "An empty string disables the signature comparison").
+// CI debug keystore differs from both upstream release & author's debug certs.
+static const char *kReleaseSign = "";
 
 // Owning package on device. Re-pointed at the kail consolidated app.
 static const char *kPackageName = "com.kail.location";
