@@ -280,8 +280,6 @@
     <string name="setting_target_packages">対象アプリのパッケージ名</string>
     <string name="setting_target_packages_summary">カンマ区切り、グローバルモードがオフの場合のみ有効。例: com.autonavi.minimap</string>
     <string name="setting_baidu_key">Baidu Map Key（再起動が必要）</string>
-    <string name="setting_selinux_permissive">シミュレーション中だけ SELinux を Permissive に</string>
-    <string name="setting_selinux_permissive_summary">オンにするとシミュレーション開始から停止までの間 SELinux を Permissive に切り替え（注入・サービス登録・モック呼び出しすべて許可）、停止後すぐに Enforcing に戻します。オフのときは SELinux を変更しません。Android 14/15 でバインドサービスが SELinux にブロックされるときに有効。</string>
     <string name="setting_enable_log">ログを有効化</string>
     <string name="setting_enable_log_summary">低頻度ログと重要な状態ログをローカルファイルに保存します</string>
     <string name="setting_enable_debug_log">詳細デバッグログを有効化</string>
@@ -759,6 +757,7 @@
     <string name="ind_sim_select_apps">対象アプリを選択</string>
     <string name="ind_sim_search_apps">アプリを検索</string>
     <string name="ind_sim_selected_count">%d 個のアプリを選択</string>
+    <string name="ind_sim_selected_apps">選択されたアプリ（%d）</string>
     <string name="wifi_sim_title">WiFi シミュレーション</string>
     <string name="wifi_sim_enable">WiFi シミュレーションを有効にする</string>
     <string name="wifi_sim_enable_summary">WiFi スキャン結果と接続情報を偽装</string>
@@ -812,6 +811,8 @@
     <string name="cell_sim_fetch_network">ネットワークから基地局を取得</string>
     <string name="cell_sim_fetching_network">取得中...</string>
     <string name="cell_sim_history">履歴</string>
+    <string name="cell_sim_selected_count">追加済みの基地局（%d）</string>
+    <string name="wifi_sim_selected_count">追加済みの Wi-Fi（%d）</string>
     <string-array name="array_sim_scheme">
         <item>@string/setting_sim_fourier</item>
         <item>@string/setting_sim_sine_noise</item>

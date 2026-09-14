@@ -307,8 +307,6 @@
     <string name="setting_target_packages">Target App Packages</string>
     <string name="setting_target_packages_summary">Comma-separated, only effective when global mode is off. E.g. com.autonavi.minimap</string>
     <string name="setting_baidu_key">Baidu Map Key (restart required)</string>
-    <string name="setting_selinux_permissive">Drop SELinux to permissive while simulating</string>
-    <string name="setting_selinux_permissive_summary">When ON, switches SELinux to permissive for the whole mock session (injection, binder registration and mock calls all allowed) and restores enforcing as soon as the simulation stops. When OFF, the app never touches SELinux. Enable this if binder services are blocked by SELinux on Android 14/15.</string>
     <string name="setting_enable_log">Enable Log</string>
     <string name="setting_enable_log_summary">Save low-frequency logs and key status logs to local files</string>
     <string name="setting_enable_debug_log">Enable Detailed Debug Log</string>
@@ -774,6 +772,7 @@
     <string name="ind_sim_select_apps">Select Target Apps</string>
     <string name="ind_sim_search_apps">Search Apps</string>
     <string name="ind_sim_selected_count">%d app(s) selected</string>
+    <string name="ind_sim_selected_apps">Selected apps (%d)</string>
 
     <!-- WiFi Simulation -->
     <string name="wifi_sim_title">WiFi Simulation</string>
@@ -831,6 +830,8 @@
     <string name="cell_sim_fetch_network">Fetch from Network</string>
     <string name="cell_sim_fetching_network">Fetching...</string>
     <string name="cell_sim_history">History</string>
+    <string name="cell_sim_selected_count">Added cells (%d)</string>
+    <string name="wifi_sim_selected_count">Added Wi-Fi (%d)</string>
 
 
     <string name="setting_opencellid_key">OpenCellID API Key</string>

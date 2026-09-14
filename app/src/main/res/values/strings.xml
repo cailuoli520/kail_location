@@ -322,8 +322,6 @@
     <string name="setting_target_packages">目标应用包名</string>
     <string name="setting_target_packages_summary">逗号分隔，仅在全局模式关闭时生效。例：com.autonavi.minimap</string>
     <string name="setting_baidu_key">百度地图 Key (需重启生效)</string>
-    <string name="setting_selinux_permissive">模拟时临时关闭 SELinux</string>
-    <string name="setting_selinux_permissive_summary">开启后从开始模拟到停止模拟期间切换为宽容模式（注入、服务注册与模拟调用全部放行），停止模拟后立即恢复强制模式；关闭则不改动 SELinux 状态。Android 14/15 上绑定服务被 SELinux 拦截时打开本项可解决</string>
     <string name="setting_opencellid_key">OpenCellID API Key</string>
     <string name="setting_opencellid_key_summary">用于通过经纬度查询周边基站，需先在 opencellid.org 注册获取</string>
     <string name="setting_enable_log">启用日志</string>
@@ -422,6 +420,7 @@
     <string name="ind_sim_select_apps">选择目标应用</string>
     <string name="ind_sim_search_apps">搜索应用</string>
     <string name="ind_sim_selected_count">已选择 %d 个应用</string>
+    <string name="ind_sim_selected_apps">已选择的应用（%d）</string>
 
     <!-- Root &amp; App Hiding -->
     <string name="nav_menu_root_app_hide">Root与应用隐藏</string>
@@ -553,6 +552,8 @@
     <string name="cell_sim_fetch_network">从网络获取基站</string>
     <string name="cell_sim_fetching_network">正在获取...</string>
     <string name="cell_sim_history">历史记录</string>
+    <string name="cell_sim_selected_count">已添加的基站（%d）</string>
+    <string name="wifi_sim_selected_count">已添加的 Wi-Fi（%d）</string>
     <string name="cell_type_gsm">GSM</string>
     <string name="cell_type_cdma">CDMA</string>
     <string name="cell_type_lte">LTE</string>

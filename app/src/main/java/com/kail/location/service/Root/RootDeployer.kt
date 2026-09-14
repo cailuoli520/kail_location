@@ -7,7 +7,6 @@ import android.os.IBinder
 import android.os.Parcel
 import androidx.preference.PreferenceManager
 import com.kail.location.inject.utils.RootControlPaths
-import com.kail.location.inject.utils.ServiceManagerBridge
 import com.kail.location.utils.KailLog
 import com.kail.location.utils.ShellUtils
 import com.kail.location.utils.SimulationDiagnostics
@@ -49,6 +48,7 @@ object RootDeployer {
     const val NATIVE_HOOK_SO = "libkail_native_hook.so"
     const val INJECTOR_BIN = "kail_inject"
     private const val INJECTION_STATE_FILE = "$RUNTIME_DIR/injection_state.txt"
+    private const val ZYGOTE_STATE_FILE = "$RUNTIME_DIR/zygote_state.txt"
     private const val BOOTSTRAP_STATE_FILE = "$RUNTIME_DIR/injectdex_state.txt"
     private const val RUNTIME_FAKELOC_INIT_LOG = "$RUNTIME_DIR/fakeloc_init.log"
     private const val RUNTIME_LHOOKER_INIT_LOG = "$RUNTIME_DIR/lhooker_init.log"
@@ -115,7 +115,32 @@ object RootDeployer {
                 if (bootstrapInjection(context)) markSystemServerInjectionCurrent(context)
             }.onFailure { KailLog.w(null, TAG, "bootstrapInjection: ${it.message}") }
         }
+
+        // ── 3. Zygote 注入：在 zygote 里预装 AppProcessHook 链，本开机后续 fork
+        //         的 App 进程自动继承；与 system_server 注入相互独立。 ──
+        ensureZygoteInjection(context)
         return@synchronized true
+    }
+
+    /**
+     * 幂等的 zygote 注入：同一开机已注入（boot+版本匹配）则跳过，否则执行
+     * [injectZygote]。[diag] 非空时把结果写入诊断步骤。
+     */
+    private fun ensureZygoteInjection(context: Context, diag: SimulationDiagnostics? = null) {
+        if (isZygoteInjectionCurrent(context)) {
+            KailLog.i(null, TAG, "ensureBaseline: zygote injection already current this boot; skip ptrace")
+            diag?.step("zygote 注入", true, "同一开机已注入过（boot+版本匹配），跳过重复 ptrace")
+            return
+        }
+        val ok = runCatching { injectZygote(context) }.getOrElse {
+            KailLog.w(null, TAG, "injectZygote: ${it.message}")
+            false
+        }
+        diag?.step(
+            "zygote 注入", ok,
+            if (ok) "libfakeloc_initzygote -> zygote 进程 Inject ok，后续 fork 的 App 自动继承 hook"
+            else "注入失败（详情见 KailLog）"
+        )
     }
 
     /**
@@ -140,6 +165,7 @@ object RootDeployer {
         if (isSystemServerInjectionEffective(context)) {
             diag.step("system_server 注入活性", true, "控制线程 ack 心跳正常，跳过重新注入")
             diag.step("ptrace 注入 system_server", true, "同一开机/system_server PID 已注入过，跳过部署和重复 ptrace")
+            ensureZygoteInjection(context, diag)
             return@synchronized true
         }
         diag.step("system_server 注入活性", false, "控制线程无响应或注入标记失效，强制重新注入")
@@ -168,6 +194,7 @@ object RootDeployer {
         }
         if (injected) markSystemServerInjectionCurrent(context)
         diag.step("ptrace 注入 system_server", injected, injectDetail)
+        ensureZygoteInjection(context, diag)
         return@synchronized injected
     }
 
@@ -249,40 +276,9 @@ object RootDeployer {
     }
 
     fun bootstrapInjectionVerbose(context: Context?): Pair<Boolean, String> {
-        // 读取"注入期间临时改宽容模式"开关。
-        //   - 开启：注入前 setenforce 0；finally 里 setenforce 1 还原。
-        //   - 关闭：完全不动 SELinux（既不切宽容，也不强制切回 Enforcing），
-        //     保持系统原本状态。注入若因 SELinux 阻塞会失败，但行为上更"安静"，
-        //     不会对系统做任何全局副作用。
-        // context 为 null 时（外部直接调无参 bootstrapInjectionVerbose()）按"关闭"处理。
-        val selinuxPermissiveDuringInject = context?.let {
-            runCatching {
-                PreferenceManager.getDefaultSharedPreferences(it)
-                    .getBoolean(SettingsViewModel.KEY_SELINUX_PERMISSIVE, false)
-            }.getOrDefault(false)
-        } ?: false
-        // 会话宽容（模拟开始→停止）：ServiceGoRoot.onStartCommand 已把系统切成
-        // Permissive，且由 onDestroy 负责恢复 Enforcing。此时注入窗口结束后
-        // 绝不能 setenforce 1 把会话宽容打断（否则后续 App 侧 find/binder 又
-        // 被 SELinux 拦截），因此 finally 只恢复非会话宽容的"注入窗口"模式。
-        val sessionPermissive = selinuxPermissiveDuringInject
-        var prevEnforce: String? = null
+        // 不改动 SELinux：不 setenforce 0，也不 setenforce 1，保持系统原本状态。
         return try {
             if (!ShellUtils.hasRoot()) return false to "su 不可用（未授权 ROOT）"
-            if (selinuxPermissiveDuringInject) {
-                // Temporarily drop SELinux to permissive for the injection window only.
-                // Android 15 sepolicy denies system_server execute/map on system_file,
-                // so the remote dlopen() of /data/kail-loc/libfakeloc_init_*.so silently
-                // fails (remote base = 0 -> doRunRemote = 0 -> "doRun resolve failed").
-                // The finally block restores enforcing immediately after kail_inject
-                // returns, so the permissive window is only ~the ptrace duration.
-                // Already-mapped .so segments stay loaded after we flip back.
-                prevEnforce = ShellUtils.executeCommand("getenforce").trim()
-                ShellUtils.executeCommand("setenforce 0")
-                KailLog.i(null, TAG, "bootstrapInjection: SELinux $prevEnforce -> Permissive (injection window, opt-in)")
-            } else {
-                KailLog.i(null, TAG, "bootstrapInjection: SELinux passthrough (permissive switch off)")
-            }
             val injector: File
             val initLoader: File
             if (context != null) {
@@ -343,15 +339,7 @@ object RootDeployer {
             KailLog.w(null, TAG, "bootstrapInjection: Xposed 桥接也不可用")
             false to "ptrace 注入失败（$ptraceDetail），Xposed 桥接也不可用"
         } finally {
-            // 会话宽容模式：注入窗口结束时不恢复 Enforcing（由 ServiceGoRoot 的
-            // onDestroy 统一恢复），否则后续模拟调用又会被 SELinux 拦截。
-            if (selinuxPermissiveDuringInject && !sessionPermissive) {
-                rootCmd("setenforce 1")
-                val nowEnforce = rootCmd("getenforce").trim()
-                KailLog.i(null, TAG, "bootstrapInjection: SELinux restored -> $nowEnforce (was $prevEnforce before inject)")
-            } else if (selinuxPermissiveDuringInject) {
-                KailLog.i(null, TAG, "bootstrapInjection: SELinux stays permissive for the mock session (restored at service stop)")
-            }
+            // 不改动 SELinux。
         }
     }
 
@@ -516,13 +504,125 @@ object RootDeployer {
         // enumerating the package's exact-cmdline PIDs and injecting each by
         // PID (-p) until one succeeds.
         KailLog.w(null, TAG, "injectAppProcess: by-name failed for $processName; trying per-PID fallback")
-        for (pid in exactCmdlinePids(processName)) {
+        for (pid in resolveProcessPids(processName)) {
             val pidCmd = "${injector.absolutePath} -p $pid -l ${appLoader.absolutePath} -n com.kail.location"
             val pidOut = rootCmd(pidCmd, ROOT_INJECT_TIMEOUT_MS)
             KailLog.i(null, TAG, "kail_inject ($processName pid=$pid) -> $pidOut")
             if (pidOut.contains("Inject ok")) return true
         }
         return false
+    }
+
+    /**
+     * Resolve a process's PIDs for the per-PID injection fallback.
+     *
+     * 优先用 `pidof`：按进程名精确匹配、毫秒级返回，覆盖绝大多数情况。只有 `pidof`
+     * 拿不到时才退回 `exactCmdlinePids` 的 /proc cmdline 扫描——那个 shell 循环在进程多
+     * 或系统繁忙时容易超过 15s 超时（之前 app-hook 注入失败的元凶）。
+     */
+    private fun resolveProcessPids(processName: String): List<Int> {
+        val pids = LinkedHashSet<Int>()
+        runCatching {
+            rootCmd("pidof $processName 2>/dev/null", 3000L).trim()
+                .split(Regex("\\s+"))
+                .mapNotNull { it.toIntOrNull() }
+                .forEach { pids.add(it) }
+        }
+        if (pids.isNotEmpty()) return pids.toList()
+        return exactCmdlinePids(processName)
+    }
+
+    /**
+     * Inject libfakeloc_initzygote into the zygote process, so the hook chain
+     * (InjectDex.initZygote -> AppProcessHook.hook on handleBindApplication)
+     * is inherited by every subsequently forked app process — no per-app
+     * ptrace needed after a reboot.
+     *
+     * Targets the zygote flavor matching the device's primary ABI
+     * (zygote64 on 64-bit devices), driven by PID (-p) which bypasses the
+     * injector's exact-cmdline name match. The zygote injection is independent
+     * of the system_server one; it may run even if the latter failed.
+     */
+    fun injectZygote(context: Context): Boolean {
+        if (!ShellUtils.hasRoot()) return false
+        val v = currentAppVersionCode(context)
+        val injector = File(STAGING_DIR, "kail_inject_v${v}")
+        val zygoteLoader = File(FAKELOC_DIR, "libfakeloc_initzygote_v${v}.so")
+        if (!injector.exists() || !zygoteLoader.exists()) {
+            KailLog.e(null, TAG, "injectZygote: injector or zygote loader missing")
+            return false
+        }
+        // The injector and the loader are deployed for the device's primary ABI
+        // only, so target the matching zygote flavor (zygote64 on 64-bit
+        // devices). PTRACE across bitness would corrupt regs reads.
+        val name = zygoteProcessName()
+        val pid = findZygotePid(name) ?: run {
+            KailLog.w(null, TAG, "injectZygote: no $name process found")
+            return false
+        }
+        val cmd = "${injector.absolutePath} -Z -p $pid -l ${zygoteLoader.absolutePath} -n com.kail.location"
+        val out = rootCmd(cmd, ROOT_INJECT_TIMEOUT_MS)
+        KailLog.i(null, TAG, "kail_inject ($name pid=$pid) -> $out")
+        if (!out.contains("Inject ok")) {
+            KailLog.w(null, TAG, "injectZygote: failed: $out")
+            return false
+        }
+        markZygoteInjectionCurrent(context, listOf(pid))
+        return true
+    }
+
+    private fun findZygotePid(name: String): String? {
+        return rootCmd("pidof $name 2>/dev/null", 1500L).trim()
+            .split(Regex("\\s+"))
+            .firstOrNull { it.isNotBlank() && it.all(Char::isDigit) }
+    }
+
+    private fun isZygoteInjectionCurrent(context: Context): Boolean {
+        val raw = rootCmd("cat $ZYGOTE_STATE_FILE 2>/dev/null", 1500L).trim()
+        if (raw.isBlank()) return false
+        val values = raw.lineSequence().mapNotNull { line ->
+            val index = line.indexOf('=')
+            if (index <= 0) null else line.substring(0, index) to line.substring(index + 1)
+        }.toMap()
+        val boot = values["kernel_btime_sec"]?.toLongOrNull() ?: return false
+        val appVersionCode = values["app_version_code"]?.trim()?.toIntOrNull() ?: return false
+        val recordedPids = values["zygote_pid"]?.trim()?.split(",")?.map { it.trim() }.orEmpty()
+        val current = boot > 0 &&
+            boot == kernelBootTimeSec() &&
+            appVersionCode == currentAppVersionCode(context) &&
+            recordedPids.isNotEmpty() &&
+            recordedPids.any { it == findZygotePid(zygoteProcessName()) }
+        if (!current) {
+            KailLog.i(
+                null, TAG,
+                "zygote state stale: state=$values boot=$boot appVer=$appVersionCode " +
+                    "currentZygote=${findZygotePid(zygoteProcessName())} recorded=${recordedPids.joinToString(",")}"
+            )
+        }
+        return current
+    }
+
+    /** zygote 进程名：按设备主 ABI 匹配（与 [injectZygote] 一致）。 */
+    private fun zygoteProcessName(): String =
+        if (preferredAbi() == "arm64-v8a" || preferredAbi() == "x86_64") "zygote64" else "zygote"
+
+    private fun markZygoteInjectionCurrent(context: Context, zygotePids: List<String>) {
+        if (zygotePids.isEmpty()) return
+        val boot = kernelBootTimeSec()
+        if (boot <= 0) return
+        val appVersionCode = currentAppVersionCode(context)
+        val payload = "kernel_btime_sec=$boot\n" +
+            "zygote_pid=${zygotePids.joinToString(",")}\n" +
+            "app_version_code=$appVersionCode\n" +
+            "wallclock_ms=${System.currentTimeMillis()}\n"
+        rootCmd(
+            "printf '%s' ${shellQuote(payload)} > $ZYGOTE_STATE_FILE && " +
+                "chmod 666 $ZYGOTE_STATE_FILE && chcon u:object_r:system_data_file:s0 $ZYGOTE_STATE_FILE 2>/dev/null || true"
+        )
+        KailLog.i(
+            null, TAG,
+            "zygote injection marked current: boot=$boot pids=${zygotePids.joinToString(",")} appVer=$appVersionCode"
+        )
     }
 
     /**
@@ -557,6 +657,7 @@ object RootDeployer {
         val v = currentAppVersionCode(context)
         if (!File(FAKELOC_DIR, "libfakeloc_v${v}.so").exists()) return false
         if (!File(FAKELOC_DIR, "libfakeloc_init_v${v}.so").exists()) return false
+        if (!File(FAKELOC_DIR, "libfakeloc_initzygote_v${v}.so").exists()) return false
         if (!File(STAGING_DIR, "kail_inject_v${v}").exists()) return false
         return true
     }
@@ -564,7 +665,7 @@ object RootDeployer {
     private data class InjectionState(
         val bootTimeSec: Long,
         val systemServerPid: String,
-        val appVersionName: String
+        val appVersionCode: Int
     )
 
     // ------------------------------------------------------------------
@@ -798,7 +899,7 @@ object RootDeployer {
             // an in-process buffer which can take >10s on cold cache and
             // sometimes never finishes (system_server gets killed by its
             // own watchdog). Pre-create it with permissive SELinux labels.
-            for (d in listOf("$FAKELOC_DIR/system_dex", "$FAKELOC_DIR/oat")) {
+            for (d in listOf("$FAKELOC_DIR/system_dex", "$FAKELOC_DIR/oat", "$FAKELOC_DIR/zygote_dex")) {
                 rootCmd("mkdir -p $d")
                 rootCmd("chmod 777 $d")
                 rootCmd("chcon u:object_r:system_file:s0 $d 2>/dev/null || true")
@@ -821,14 +922,14 @@ object RootDeployer {
         val state = readInjectionState() ?: return false
         val boot = kernelBootTimeSec()
         val pid = systemServerPid()
-        val appVersionName = currentAppVersionName(context)
+        val appVersionCode = currentAppVersionCode(context)
         val current = boot > 0 &&
             state.bootTimeSec == boot &&
             pid.isNotBlank() &&
             state.systemServerPid == pid &&
-            state.appVersionName == appVersionName
+            state.appVersionCode == appVersionCode
         if (!current) {
-            KailLog.i(null, TAG, "injection state stale: state=$state boot=$boot pid=$pid app=$appVersionName")
+            KailLog.i(null, TAG, "injection state stale: state=$state boot=$boot pid=$pid appVer=$appVersionCode")
         }
         return current
     }
@@ -917,16 +1018,16 @@ object RootDeployer {
             KailLog.w(null, TAG, "mark injection skipped: boot=$boot pid=$pid")
             return
         }
-        val appVersionName = currentAppVersionName(context)
+        val appVersionCode = currentAppVersionCode(context)
         val payload = "kernel_btime_sec=$boot\n" +
             "system_server_pid=$pid\n" +
-            "app_version_name=$appVersionName\n" +
+            "app_version_code=$appVersionCode\n" +
             "wallclock_ms=${System.currentTimeMillis()}\n"
         rootCmd(
             "printf '%s' ${shellQuote(payload)} > $INJECTION_STATE_FILE && " +
                 "chmod 666 $INJECTION_STATE_FILE && chcon u:object_r:system_data_file:s0 $INJECTION_STATE_FILE 2>/dev/null || true"
         )
-        KailLog.i(null, TAG, "system_server injection marked current: boot=$boot pid=$pid app=$appVersionName")
+        KailLog.i(null, TAG, "system_server injection marked current: boot=$boot pid=$pid appVer=$appVersionCode")
     }
 
     private fun readInjectionState(): InjectionState? {
@@ -939,15 +1040,8 @@ object RootDeployer {
         val boot = values["kernel_btime_sec"]?.toLongOrNull() ?: return null
         val pid = values["system_server_pid"]?.trim() ?: return null
         if (pid.isBlank()) return null
-        val appVersionName = values["app_version_name"]?.trim() ?: ""
-        if (appVersionName.isBlank()) return null
-        return InjectionState(boot, pid, appVersionName)
-    }
-
-    private fun currentAppVersionName(context: Context): String {
-        return runCatching {
-            context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: ""
-        }.getOrDefault("")
+        val appVersionCode = values["app_version_code"]?.trim()?.toIntOrNull() ?: return null
+        return InjectionState(boot, pid, appVersionCode)
     }
 
     private fun currentAppVersionCode(context: Context): Int {
