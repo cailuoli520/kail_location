@@ -104,17 +104,53 @@ public final class LocationShm {
     static {
         Access a = null;
         try {
-            // sun.misc.Unsafe 属 hidden API，先尝试放行。
-            HiddenApiBypass.bypassHiddenApiRestrictions();
-            Class<?> clazz = Class.forName("com.kail.location.inject.utils.LocationShmAccess");
-            java.lang.reflect.Constructor<?> ctor = clazz.getDeclaredConstructor();
-            ctor.setAccessible(true);
-            a = (Access) ctor.newInstance();
+            // [LOCAL-UNLOCK] MTK HyperOS 的 ART 实现在 Unsafe.put*Volatile/get*Volatile
+            // 里把 64 位 raw address 截断成 32 位再符号扩展（与之前
+            // ByteBufferViewVarHandle 同一类 ART bug）。在这类设备上任何对 direct
+            // ByteBuffer 的 raw-address 写入都会 SIGSEGV（实测：Xiaomi 23054RA19C
+            // / HyperOS A15，ServiceGoRootBo 线程崩在 art::Unsafe_putIntVolatile，
+            // fault addr 0xffffffdf279000，导致 app 进程死亡→白屏→重启）。
+            // 整条 SHM 快速路径依赖 raw-address 访问，所以在 MTK 平台上直接禁用，
+            // 回退到已验证可用的控制文件通道（功能不回归，只是每 tick 走 su+文件）。
+            if (isMediaTekDevice()) {
+                InjectLog.persist("LocationShm",
+                    "shm disabled on MediaTek device (ART raw-address truncation bug);"
+                        + " using control-file transport");
+            } else {
+                // sun.misc.Unsafe 属 hidden API，先尝试放行。
+                HiddenApiBypass.bypassHiddenApiRestrictions();
+                Class<?> clazz = Class.forName("com.kail.location.inject.utils.LocationShmAccess");
+                java.lang.reflect.Constructor<?> ctor = clazz.getDeclaredConstructor();
+                ctor.setAccessible(true);
+                a = (Access) ctor.newInstance();
+            }
         } catch (Throwable t) {
             a = null;
             InjectLog.e("LocationShm", "shm access init failed; fallback to control file", t);
         }
         ACCESS = a;
+    }
+
+    // [LOCAL-UNLOCK] MTK SoC 判定：Build.SOC_MANUFACTURER / HARDWARE / BOARD。
+    // HyperOS 设备三项里至少一项含 "mtk"/"mediatek"；用大小写不敏感包含匹配，
+    // 避免漏掉 "MT6877" 之类的硬件代号。
+    private static boolean isMediaTekDevice() {
+        try {
+            String[] candidates = {
+                android.os.Build.SOC_MANUFACTURER,
+                android.os.Build.HARDWARE,
+                android.os.Build.BOARD,
+                android.os.Build.FINGERPRINT
+            };
+            for (String c : candidates) {
+                if (c != null) {
+                    String low = c.toLowerCase(java.util.Locale.ROOT);
+                    if (low.contains("mtk") || low.contains("mediatek")) return true;
+                }
+            }
+        } catch (Throwable ignored) {
+        }
+        return false;
     }
 
     /** false 表示当前运行时没有可用的 VarHandle（低版本/加载失败），调用方应回退文件通道。 */
